@@ -18,6 +18,8 @@
   header h1{font-size:20px;margin:0;font-weight:600;letter-spacing:.5px}
   header h1 small{color:var(--dim);font-weight:400;font-size:12px;margin-left:8px}
   .spacer{flex:1}
+  @media (max-width:1750px){header h1 small{display:none}}
+  @media (max-width:1400px){#badge{min-width:0}header button,header select{padding:6px 8px;font-size:12px}}
   #badge{font-size:13px;font-weight:700;letter-spacing:1px;padding:5px 12px;border-radius:999px;
     background:#1a2a1e;color:var(--ok);border:1px solid currentColor;min-width:150px;text-align:center;transition:all .25s}
   #badge.WRONG_DIRECTION{background:#2a2110;color:var(--warn)}
@@ -38,7 +40,9 @@
   #banner.arrived{border-color:var(--gold);box-shadow:0 0 60px rgba(255,210,122,.25) inset}
   @keyframes flash{from{background:#2a1c0c}to{background:#141a2c}}
   main{display:flex;gap:14px;padding:0 18px 10px;flex:1;min-height:0}
-  #stage{flex:1;min-width:0;display:flex;align-items:center;justify-content:center}
+  #stage{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;perspective:1500px;perspective-origin:50% 30%}
+  body.tilt canvas#map{transform:rotateX(30deg) translateY(-4%) scale(1.06);transform-origin:50% 60%;box-shadow:0 0 0 1px #1a2338,0 60px 80px rgba(0,0,0,.75)}
+  canvas#map{transition:transform .6s ease}
   canvas#map{width:100%;max-height:100%;aspect-ratio:960/600;border-radius:14px;
     box-shadow:0 0 0 1px #1a2338,0 30px 60px rgba(0,0,0,.6);background:#0b0f1a;cursor:crosshair;touch-action:none;object-fit:contain}
   aside#panel{width:352px;flex:none;display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0}
@@ -85,14 +89,16 @@
     <option value="2">象山站 出口3</option>
   </select>
   <button id="btnTrip">新旅程 New trip</button>
-  <button id="btnAuto">迷路觀光客 自動走</button>
+  <button id="btnP1" class="persona" data-p="1">路痴旅客 1｜只懂左右</button>
+  <button id="btnP2" class="persona" data-p="2">路痴旅客 2｜只認路標</button>
+  <button id="btn3d" class="on">3D 視角</button>
   <button id="btnMute" title="靜音">🔊 語音</button>
 </header>
 <div id="banner"><div class="zh">跟我走，我知道路。</div><div class="en">Follow me, I know the way.</div></div>
 <main>
   <div id="stage"><canvas id="map" width="960" height="600"></canvas></div>
   <aside id="panel">
-    <section class="card"><h3>飛寶的使用者模型 <span>how you understand directions</span></h3><div id="styles"></div></section>
+    <section class="card"><h3>飛寶的使用者模型 <span id="personaTag">how you understand directions</span></h3><div id="styles"></div></section>
     <section class="card"><h3>證據紀錄 <span>evidence log</span></h3><ul id="log"></ul></section>
     <section class="card"><h3>旅程報告 <span>trip report</span></h3>
       <table id="trips"><thead><tr><th>#</th><th>起點</th><th class="num">用時</th><th class="num">走錯</th><th>最後偏好</th></tr></thead><tbody></tbody></table>
@@ -311,11 +317,14 @@ const Guidance={
   },
   landmark(q){
     let best=null;
-    for(const lm of LANDMARKS){
-      if(!lm.guide) continue;
-      const vx=lm.x-q.pos.x, vy=lm.y-q.pos.y, d=hyp(vx,vy); if(d<22||d>200) continue;
-      const ahead=(vx*q.dirTo[0]+vy*q.dirTo[1])/d; if(ahead<0.4) continue;   // near AND ahead along the way
-      if(!best||d<best.d) best={lm,d,vx,vy};
+    for(const R of [200,420]){ // near-and-ahead first; if nothing is near, the nearest glowing thing farther ahead
+      for(const lm of LANDMARKS){
+        if(!lm.guide) continue;
+        const vx=lm.x-q.pos.x, vy=lm.y-q.pos.y, d=hyp(vx,vy); if(d<22||d>R) continue;
+        const ahead=(vx*q.dirTo[0]+vy*q.dirTo[1])/d; if(ahead<0.35) continue;
+        if(!best||d<best.d) best={lm,d,vx,vy};
+      }
+      if(best) break;
     }
     if(!best){ const r=Guidance.relative(q); r.fallback=true; return r; }  // recorded under relative, never landmark
     const a=signedAngle(q.facing[0],q.facing[1],best.vx,best.vy); const abs=Math.abs(a), side=a>0?'右':'左', sideEn=a>0?'right':'left';
@@ -411,6 +420,14 @@ const bg=document.createElement('canvas'); bg.width=W*DPR; bg.height=H*DPR; cons
 function rrect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function glow(c,x,y,r,color,a){ const g=c.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,color.replace('A',a)); g.addColorStop(1,color.replace('A',0)); c.fillStyle=g; c.fillRect(x-r,y-r,r*2,r*2); }
 
+// 2.5D: roof = footprint lifted by hz; the south wall and a thin east wall fill the gap
+function extrude(c,x,y,w,h,hz,roof){
+  c.fillStyle='rgba(0,0,0,.45)'; rrect(c,x+3,y+4,w,h,3); c.fill();          // drop shadow on the ground
+  c.fillStyle='#0a0d16'; c.fillRect(x,y+h-hz,w,hz);                           // south wall
+  c.fillStyle='rgba(255,200,130,.18)'; for(let i=6;i<w-4;i+=9) c.fillRect(x+i,y+h-hz+3,4,hz-6>0?hz-6:2); // lit wall windows
+  c.fillStyle='#0d1220'; c.beginPath(); c.moveTo(x+w,y-hz); c.lineTo(x+w+3,y-hz+3); c.lineTo(x+w+3,y+h-hz+3); c.lineTo(x+w,y+h-hz); c.closePath(); c.fill(); // east wall sliver
+  c.fillStyle=roof; rrect(c,x,y-hz,w,h,3); c.fill(); c.strokeStyle='rgba(120,140,190,.16)'; c.lineWidth=1; c.stroke();
+}
 function drawBuildings(c){
   const rnd=mulberry32(20260920);
   const xs=[[0,127],[153,367],[393,667],[693,W]];
@@ -423,17 +440,17 @@ function drawBuildings(c){
     const bw=x1-x0, bh=y1-y0; const n=1+Math.floor(rnd()*3);
     let cx=x0+6;
     for(let k=0;k<n;k++){
-      const w=Math.max(30,(bw-12)/n-6+rnd()*10); const h=Math.max(28,bh*(0.45+rnd()*0.5)); const y=y0+6+(bh-12-h)*rnd();
+      const HZ=10+Math.floor(rnd()*9); // pseudo height
+      const w=Math.max(30,(bw-12)/n-6+rnd()*10); const h=Math.max(24,(bh-HZ)*(0.45+rnd()*0.5)); const y=y0+6+HZ+(bh-12-HZ-h)*rnd();
       if(cx+w>x1-6) break;
-      if(!skip(cx,y,w,h)){
-        c.fillStyle=`hsl(${222+rnd()*10},${28+rnd()*10}%,${9+rnd()*5}%)`; rrect(c,cx,y,w,h,3); c.fill();
-        c.strokeStyle='rgba(120,140,190,.12)'; c.lineWidth=1; c.stroke();
+      if(!skip(cx,y-HZ,w,h+HZ)){
+        extrude(c,cx,y,w,h,HZ,`hsl(${222+rnd()*10},${28+rnd()*10}%,${9+rnd()*5}%)`);
         // warm windows
         const cols=Math.floor(w/9), rows=Math.floor(h/10);
         for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){
           const r=rnd(); if(r<0.55) continue;
           c.fillStyle=r>0.9?'rgba(255,214,140,.75)':r>0.75?'rgba(255,190,110,.45)':'rgba(255,205,140,.22)';
-          c.fillRect(cx+5+i*9,y+5+j*10,4,5);
+          c.fillRect(cx+5+i*9,y-HZ+5+j*10,4,5);
         }
       }
       cx+=w+8;
@@ -476,9 +493,11 @@ function drawStreets(c){
 }
 function drawHNBK(c){
   const B=HNBK;
-  c.fillStyle='#161f33'; rrect(c,B.x,B.y,B.w,B.h,4); c.fill(); c.strokeStyle='#3a4c72'; c.lineWidth=1.5; c.stroke();
+  c.fillStyle='rgba(0,0,0,.5)'; rrect(c,B.x+4,B.y+6,B.w,B.h,4); c.fill();
+  c.fillStyle='#0b1020'; c.fillRect(B.x,B.y+B.h-14,B.w,14); c.fillStyle='rgba(255,210,140,.22)'; for(let i=8;i<B.w-6;i+=10) c.fillRect(B.x+i,B.y+B.h-10,4,6);
+  c.fillStyle='#161f33'; rrect(c,B.x,B.y-14,B.w,B.h,4); c.fill(); c.strokeStyle='#3a4c72'; c.lineWidth=1.5; c.stroke();
   // window grid
-  for(let i=0;i<16;i++) for(let j=0;j<12;j++){ const rn=((i*7+j*13)%10); if(rn<4) continue; c.fillStyle=rn>8?'rgba(255,225,160,.75)':'rgba(255,210,140,.35)'; c.fillRect(B.x+10+i*9,B.y+16+j*10,4,5); }
+  for(let i=0;i<16;i++) for(let j=0;j<12;j++){ const rn=((i*7+j*13)%10); if(rn<4) continue; c.fillStyle=rn>8?'rgba(255,225,160,.75)':'rgba(255,210,140,.35)'; c.fillRect(B.x+10+i*9,B.y+2+j*10,4,5); }
   // lobby gold glow
   glow(c,LM.lobby.x,LM.lobby.y,70,'rgba(255,200,90,A)',0.35);
   // entrance canopy on the Songren Rd side
@@ -490,12 +509,16 @@ function drawHNBK(c){
 }
 function drawNanshan(c){
   const B=NANSHAN;
+  c.fillStyle='rgba(0,0,0,.5)'; c.beginPath(); c.moveTo(B.x+4,B.y+B.h+6); c.lineTo(B.x+4,B.y+36); c.lineTo(B.x+B.w*0.55+4,B.y+6); c.lineTo(B.x+B.w+4,B.y+46); c.lineTo(B.x+B.w+4,B.y+B.h+6); c.closePath(); c.fill();
+  c.fillStyle='#0a1020'; c.fillRect(B.x,B.y+B.h-16,B.w,16); c.fillStyle='rgba(170,205,255,.25)'; for(let i=8;i<B.w-6;i+=10) c.fillRect(B.x+i,B.y+B.h-12,4,7);
+  c.save(); c.translate(0,-16);
   c.fillStyle='#10192b'; c.beginPath(); c.moveTo(B.x,B.y+B.h); c.lineTo(B.x,B.y+30); c.lineTo(B.x+B.w*0.55,B.y); c.lineTo(B.x+B.w,B.y+40); c.lineTo(B.x+B.w,B.y+B.h); c.closePath(); c.fill();
   c.strokeStyle='#3f5a8a'; c.lineWidth=1.5; c.stroke();
   for(let i=0;i<15;i++) for(let j=0;j<11;j++){ const rn=((i*5+j*11)%9); if(rn<3) continue; const x=B.x+12+i*10, y=B.y+44+j*9; c.fillStyle=rn>7?'rgba(200,230,255,.8)':'rgba(170,205,255,.35)'; c.fillRect(x,y,4,5); }
   // crown light
   glow(c,B.x+B.w*0.55,B.y+6,40,'rgba(150,200,255,A)',0.5);
   c.fillStyle='#cfe6ff'; c.beginPath(); c.arc(B.x+B.w*0.55,B.y+4,3,0,Math.PI*2); c.fill();
+  c.restore();
 }
 function drawIcon(c,lm){
   const {x,y}=lm;
@@ -652,7 +675,7 @@ function drawPlayer(c,p){
    GAME CONTROLLER
    ===================================================================== */
 const engine=new NavEngine();
-const model=new UserModel();
+let model=new UserModel();
 const banner=document.getElementById('banner'), bZh=banner.querySelector('.zh'), bEn=banner.querySelector('.en');
 const badge=document.getElementById('badge');
 const BADGE={ON_ROUTE:'ON ROUTE 在路上',WRONG_DIRECTION:'WRONG DIRECTION 走錯方向',OFF_ROUTE:'OFF ROUTE 偏離路線',RECOVERED:'RECOVERED 回到路上',ARRIVED:'ARRIVED 抵達'};
@@ -664,7 +687,7 @@ const G={
   trail:[], particles:[], powderUntil:-1,
   trip:null, trips:[], trial:null, instr:null,
   pending:[], correctionUntil:-1, lastCorrection:-99, lastRecoveryLine:-99, banner:{zh:'',en:''},
-  auto:false, walker:{mode:'idle',dir:[0,0],style:null}, instrSeq:0,
+  auto:false, persona:null, walker:{mode:'idle',dir:[0,0],style:null}, instrSeq:0,
   log:[], keys:new Set(), pointer:{down:false,x:0,y:0},
   uiDirty:true,
 };
@@ -697,7 +720,7 @@ function finishTrip(){
   Voice.say('到了。收工！',true); Sfx.chime();
   addLog(`抵達 華南銀行國際會議中心 入口 — 用時 ${tr.time.toFixed(1)}s，走錯 ${tr.wrong} 次`,'arrive');
   burst(); G.powderUntil=G.t+4;
-  if(G.auto){ G.auto=false; btnAuto.classList.remove('on'); btnAuto.textContent='迷路觀光客 自動走'; }
+  if(G.auto){ G.auto=false; syncPersonaButtons(); }
   G.uiDirty=true;
 }
 
@@ -764,7 +787,8 @@ function doCorrection(){
 function walkable(x,y){ const ne=engine.nearestEdge(x,y); return ne.d<engine.streetHalfWidthAt(ne)-2 && x>4&&x<W-4&&y>4&&y<H-4; }
 function walkerReact(style){
   const w=G.walker; w.style=style;
-  if(style==='cardinal'){ // ignores cardinal words: takes a wrong turn instead
+  const follows=G.persona?G.persona.follows:['relative','landmark'];
+  if(!follows.includes(style)){ // this tourist does not understand this kind of instruction: takes a wrong turn instead
     const [dx,dy]=engine.dirTo; const p=G.player;
     const cands=[[-dx,-dy],[-dy,dx],[dy,-dx]]; const rot=model.count%3; const ordered=cands.slice(rot).concat(cands.slice(0,rot));
     w.mode='idle'; for(const d of ordered){ if(walkable(p.x+d[0]*26,p.y+d[1]*26)){ w.dir=d; w.mode='wander'; break; } }
@@ -818,11 +842,23 @@ function humanVelocity(){
 }
 
 /* ---- UI buttons ---- */
-const btnTrip=document.getElementById('btnTrip'), btnAuto=document.getElementById('btnAuto'), btnMute=document.getElementById('btnMute'), exitSel=document.getElementById('exitSel');
+const btnTrip=document.getElementById('btnTrip'), btnMute=document.getElementById('btnMute'), exitSel=document.getElementById('exitSel'), btn3d=document.getElementById('btn3d');
+const PERSONAS={
+  1:{id:1,name:'路痴旅客 1｜只懂左右',en:'tourist 1 · understands left/right only',follows:['relative']},
+  2:{id:2,name:'路痴旅客 2｜只認路標',en:'tourist 2 · follows landmarks only',follows:['landmark']},
+};
+function syncPersonaButtons(){ document.querySelectorAll('button.persona').forEach(b=>{ const on=G.auto&&G.persona&&G.persona.id===+b.dataset.p; b.classList.toggle('on',on); b.textContent=(on?'■ 停止 ':'')+PERSONAS[b.dataset.p].name; });
+  document.getElementById('personaTag').textContent=G.persona?PERSONAS[G.persona.id].en+' — 獨立記憶':'how you understand directions'; }
+function resetMemory(){ model=new UserModel(); G.trips=[]; G.log=[]; G.uiDirty=true; }
+document.querySelectorAll('button.persona').forEach(b=>b.onclick=()=>{ Sfx.ensure(); const P=PERSONAS[b.dataset.p];
+  if(G.auto&&G.persona&&G.persona.id===P.id){ G.auto=false; G.walker.mode='idle'; syncPersonaButtons(); return; }
+  if(!G.persona||G.persona.id!==P.id){ G.persona=P; resetMemory(); addLog(`切換為「${P.name}」— 記憶重新開始（兩位旅客的記憶不重疊）`,'switch'); }
+  G.auto=true; startTrip(pickExit()); syncPersonaButtons(); });
+btn3d.onclick=()=>{ document.body.classList.toggle('tilt'); btn3d.classList.toggle('on',document.body.classList.contains('tilt')); };
+document.body.classList.add('tilt');
 function pickExit(){ const v=+exitSel.value; return v>=0?v:Math.floor(Math.random()*3); }
 btnTrip.onclick=()=>{ Sfx.ensure(); startTrip(pickExit()); };
-btnAuto.onclick=()=>{ Sfx.ensure(); G.auto=!G.auto; btnAuto.classList.toggle('on',G.auto); btnAuto.textContent=G.auto?'停止自動走 Stop':'迷路觀光客 自動走';
-  if(G.auto){ if(G.trial){G.trial.armed=true; G.trial.t0=G.t;} if(!G.trip||G.trip.done) startTrip(pickExit()); else if(G.instr) walkerReact(G.instr.style); } else G.walker.mode='idle'; };
+
 btnMute.onclick=()=>{ const m=!Voice.muted; Voice.muted=m; Sfx.muted=m; if(m) Voice.stop(); btnMute.textContent=m?'🔇 靜音':'🔊 語音'; btnMute.classList.toggle('on',m); };
 
 /* ---- side panel ---- */
