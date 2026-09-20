@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fable Night Owl 飛寶 · 信義夜行導引</title>
+<style>
+  :root{
+    --bg:#070a12; --card:#0e1320; --line:#1c2437; --text:#e8e4d8; --dim:#8a93a8;
+    --gold:#ffd27a; --amber:#f6b331; --cyan:#5ee0ff;
+    --ok:#3ddc84; --warn:#ffb020; --bad:#ff5a5a; --info:#5ea8ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei","Helvetica Neue",system-ui,sans-serif;overflow:hidden}
+  body{display:flex;flex-direction:column;height:100vh}
+  header{display:flex;align-items:center;gap:14px;padding:10px 18px 6px;flex-wrap:wrap}
+  header h1{font-size:20px;margin:0;font-weight:600;letter-spacing:.5px}
+  header h1 small{color:var(--dim);font-weight:400;font-size:12px;margin-left:8px}
+  .spacer{flex:1}
+  #badge{font-size:13px;font-weight:700;letter-spacing:1px;padding:5px 12px;border-radius:999px;
+    background:#1a2a1e;color:var(--ok);border:1px solid currentColor;min-width:150px;text-align:center;transition:all .25s}
+  #badge.WRONG_DIRECTION{background:#2a2110;color:var(--warn)}
+  #badge.OFF_ROUTE{background:#2b1414;color:var(--bad)}
+  #badge.RECOVERED{background:#132038;color:var(--info)}
+  #badge.ARRIVED{background:#2b2410;color:var(--gold)}
+  button,select{font:inherit;font-size:13px;color:var(--text);background:#151c2c;border:1px solid #2a3450;
+    border-radius:8px;padding:6px 12px;cursor:pointer;transition:background .15s}
+  button:hover{background:#1d2740}
+  button.on{background:#2b2410;border-color:var(--gold);color:var(--gold)}
+  #banner{margin:2px 18px 8px;padding:12px 22px;border-radius:14px;background:linear-gradient(180deg,#121a2c,#0d1320);
+    border:1px solid #223050;min-height:104px;display:flex;flex-direction:column;justify-content:center;
+    box-shadow:0 0 40px rgba(94,224,255,.06) inset}
+  #banner .zh{font-size:46px;line-height:1.15;font-weight:700;color:var(--gold);letter-spacing:1px;text-shadow:0 0 22px rgba(255,210,122,.35)}
+  #banner .en{font-size:20px;color:#b9c3d9;margin-top:4px;font-weight:400}
+  #banner.correct{animation:flash .45s ease-in-out infinite alternate;border-color:var(--warn)}
+  #banner.correct .zh{color:#ffc36b}
+  #banner.arrived{border-color:var(--gold);box-shadow:0 0 60px rgba(255,210,122,.25) inset}
+  @keyframes flash{from{background:#2a1c0c}to{background:#141a2c}}
+  main{display:flex;gap:14px;padding:0 18px 10px;flex:1;min-height:0}
+  #stage{flex:1;min-width:0;display:flex;align-items:center;justify-content:center}
+  canvas#map{width:100%;max-height:100%;aspect-ratio:960/600;border-radius:14px;
+    box-shadow:0 0 0 1px #1a2338,0 30px 60px rgba(0,0,0,.6);background:#0b0f1a;cursor:crosshair;touch-action:none;object-fit:contain}
+  aside#panel{width:352px;flex:none;display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .card h3{margin:0 0 8px;font-size:14px;font-weight:600;letter-spacing:.5px}
+  .card h3 span{color:var(--dim);font-weight:400;font-size:11px;margin-left:6px}
+  .style{margin-bottom:9px}
+  .style .row{display:flex;justify-content:space-between;font-size:12.5px;align-items:baseline}
+  .style .row b{font-size:13px}
+  .style .row .tag{font-size:10px;font-weight:700;letter-spacing:1px;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
+  .tag.pref{background:#12301f;color:var(--ok)}
+  .tag.avoid{background:#3a1414;color:var(--bad)}
+  .tag.cur{background:#1a2440;color:var(--info)}
+  .bar{height:8px;background:#161d2e;border-radius:4px;margin-top:4px;overflow:hidden;position:relative}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#3ddc84,#9be7b8);border-radius:4px;transition:width .4s}
+  .bar.avoid i{background:linear-gradient(90deg,#ff5a5a,#b33)}
+  .style .ev{font-size:11px;color:var(--dim);margin-top:3px;min-height:12px}
+  ul#log{list-style:none;margin:0;padding:0;font-size:12.5px;max-height:190px;overflow:auto}
+  ul#log li{padding:3px 0;border-bottom:1px dashed #182036;color:#cfd6e6}
+  ul#log li time{color:var(--dim);font-size:11px;margin-right:6px;font-variant-numeric:tabular-nums}
+  ul#log li.switch{color:var(--warn)}
+  ul#log li.cur{color:var(--info)}
+  ul#log li.arrive{color:var(--gold)}
+  ul#log li.fail{color:#ff9c9c}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:4px 6px;text-align:left;border-bottom:1px solid #182036}
+  th{color:var(--dim);font-weight:500;font-size:11px}
+  tr.better td{background:#10301c;color:#9be7b8}
+  tr.better td:first-child{border-left:3px solid var(--ok)}
+  td.num{font-variant-numeric:tabular-nums;text-align:right}
+  footer{padding:2px 18px 8px;font-size:12px;color:var(--dim);display:flex;gap:18px;flex-wrap:wrap}
+  footer kbd{background:#151c2c;border:1px solid #2a3450;border-radius:4px;padding:0 5px;font-family:inherit}
+</style>
+</head>
+<body>
+<header>
+  <h1>Fable Night Owl <span style="color:var(--gold)">飛寶</span><small>夜行導引 · 信義路五段 × 松仁路 · 學習你看方向的方式</small></h1>
+  <div class="spacer"></div>
+  <div id="badge" class="ON_ROUTE">ON ROUTE 在路上</div>
+  <select id="exitSel" title="起點">
+    <option value="-1">隨機出口 Random exit</option>
+    <option value="0">象山站 出口1</option>
+    <option value="1">象山站 出口2</option>
+    <option value="2">象山站 出口3</option>
+  </select>
+  <button id="btnTrip">新旅程 New trip</button>
+  <button id="btnAuto">迷路觀光客 自動走</button>
+  <button id="btnMute" title="靜音">🔊 語音</button>
+</header>
+<div id="banner"><div class="zh">跟我走，我知道路。</div><div class="en">Follow me, I know the way.</div></div>
+<main>
+  <div id="stage"><canvas id="map" width="960" height="600"></canvas></div>
+  <aside id="panel">
+    <section class="card"><h3>飛寶的使用者模型 <span>how you understand directions</span></h3><div id="styles"></div></section>
+    <section class="card"><h3>證據紀錄 <span>evidence log</span></h3><ul id="log"></ul></section>
+    <section class="card"><h3>旅程報告 <span>trip report</span></h3>
+      <table id="trips"><thead><tr><th>#</th><th>起點</th><th class="num">用時</th><th class="num">走錯</th><th>最後偏好</th></tr></thead><tbody></tbody></table>
+    </section>
+  </aside>
+</main>
+<footer>
+  <span><kbd>↑↓←→</kbd> / <kbd>WASD</kbd> 走路</span>
+  <span>按住滑鼠或觸控，往想去的方向走</span>
+  <span>目的地：華南銀行國際會議中心（松仁路123號）— 只有走到入口門前 20px 內才算抵達</span>
+</footer>
+<script>
+'use strict';
+/* =====================================================================
+   Fable Night Owl 飛寶
+   Two strictly separated planes:
+     · NavEngine  — navigation truth: street graph, shortest path, monotonic
+                    waypoint commitment, per-frame state classification, replan.
+     · Guidance   — phrases the engine's next step (cardinal/relative/landmark).
+                    Never computes routes.
+   Plus: UserModel (per-style trials, 3-strike AVOIDED, sticky preference,
+   every-5th curiosity), Renderer, Audio/Voice, Game controller.
+   ===================================================================== */
+
+const W=960, H=600, ARRIVE_R=20, DRIFT_REPLAN=250;
+const canvas=document.getElementById('map');
+const ctx=canvas.getContext('2d');
+const DPR=Math.min(2, window.devicePixelRatio||1);
+canvas.width=W*DPR; canvas.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+
+/* ---------- utils ---------- */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const hyp=Math.hypot;
+function norm(x,y){const l=hyp(x,y)||1;return [x/l,y/l];}
+function projSeg(px,py,ax,ay,bx,by){
+  const dx=bx-ax, dy=by-ay, l2=dx*dx+dy*dy||1;
+  let t=((px-ax)*dx+(py-ay)*dy)/l2; t=clamp(t,0,1);
+  const x=ax+dx*t, y=ay+dy*t; return {t,x,y,d:hyp(px-x,py-y)};
+}
+// signed angle from a to b in degrees; positive = clockwise on screen = to the RIGHT (y-down)
+function signedAngle(ax,ay,bx,by){return Math.atan2(ax*by-ay*bx, ax*bx+ay*by)*180/Math.PI;}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const fmtT=s=>{s=Math.max(0,s|0);return (s/60|0)+':'+String(s%60).padStart(2,'0');};
+
+/* ---------- MAP DATA (stylized Taipei Xinyi block) ---------- */
+const STREETS=[
+  {id:'xinyi',   name:'信義路五段', en:'Xinyi Rd. Sec. 5', axis:'h', pos:500, from:0,   to:W,   hw:18},
+  {id:'songshou',name:'松壽路',     en:'Songshou Rd.',     axis:'h', pos:300, from:0,   to:W,   hw:13},
+  {id:'songgao', name:'松高路',     en:'Songgao Rd.',      axis:'h', pos:110, from:0,   to:W,   hw:13},
+  {id:'songzhi', name:'松智路',     en:'Songzhi Rd.',      axis:'v', pos:140, from:0,   to:H,   hw:13},
+  {id:'songren', name:'松仁路',     en:'Songren Rd.',      axis:'v', pos:380, from:0,   to:H,   hw:14},
+  {id:'songyong',name:'松勇路',     en:'Songyong Rd.',     axis:'v', pos:680, from:0,   to:500, hw:13},
+];
+const MRT_Y=566;
+const EXITS=[{n:1,x:330},{n:2,x:560},{n:3,x:760}];         // nodes on Xinyi Rd (y=500)
+const DOOR={x:406,y:400};                                    // the ONE true entrance (Songren Rd side of HNBK)
+const APPROACH={x:380,y:400};                                // point on Songren Rd in front of the door
+const HNBK={x:400,y:330,w:160,h:140};
+const SOLID=[HNBK,{x:180,y:330,w:160,h:140}];
+const NANSHAN={x:180,y:330,w:160,h:140};
+const EXTRA=[...EXITS.map(e=>({street:'xinyi',t:e.x})),{street:'songren',t:APPROACH.y}];
+
+// landmarks: glowing icons; guide:true → usable in landmark-style instructions
+const LANDMARKS=[
+  {id:'exit1', name:'捷運象山站 出口1', en:'MRT Xiangshan Exit 1', x:330,y:518, type:'exit', n:1, guide:true, cands:['b','l','r']},
+  {id:'exit2', name:'捷運象山站 出口2', en:'MRT Xiangshan Exit 2', x:560,y:518, type:'exit', n:2, guide:true, cands:['b','r','l']},
+  {id:'exit3', name:'捷運象山站 出口3', en:'MRT Xiangshan Exit 3', x:760,y:518, type:'exit', n:3, guide:true, cands:['b','r','l']},
+  {id:'nanshan', name:'台北南山廣場', en:'Taipei Nan Shan Plaza', x:260,y:400, type:'nanshan', guide:true, cands:['in']},
+  {id:'seven', name:'7-Eleven', en:'7-Eleven', x:648,y:462, type:'seven', guide:true, cands:['a','l','b']},
+  {id:'family', name:'全家', en:'FamilyMart', x:350,y:200, type:'family', guide:true, cands:['l','a','b']},
+  {id:'starbucks', name:'星巴克', en:'Starbucks', x:600,y:266, type:'starbucks', guide:true, cands:['a','r','l']},
+  {id:'youbike', name:'微笑單車 YouBike', en:'YouBike station', x:712,y:332, type:'youbike', guide:true, cands:['r','b','a']},
+  {id:'zebra', name:'斑馬線', en:'Crosswalk', x:380,y:470, type:'zebra', guide:true, cands:['l','r']},
+  {id:'musha', name:'慕夏四季大廈', en:'Mucha Four Seasons Bldg.', x:470,y:190, type:'musha', guide:true, cands:['r','a','b']},
+  {id:'lobby', name:'大廳金燈', en:'Lobby light', x:486,y:404, type:'lobby', guide:true, cands:['b','r']},
+  {id:'door', name:'入口', en:'Entrance', x:DOOR.x,y:DOOR.y, type:'door', guide:false, cands:['a','b']},
+  {id:'hnbk', name:'華南銀行國際會議中心', en:'HNBK · 松仁路123號', x:480,y:346, type:'hnbklabel', guide:false, cands:['c']},
+];
+const LM=Object.fromEntries(LANDMARKS.map(l=>[l.id,l]));
+
+/* =====================================================================
+   NAVIGATION-TRUTH ENGINE
+   ===================================================================== */
+class NavEngine{
+  constructor(){
+    this.nodes=[]; this.edges=[]; this._key=new Map();
+    this.build();
+    this.door=this.node(DOOR.x,DOOR.y);
+    this.precompute();
+    this.route=null; this.state='ON_ROUTE'; this.raw='ON_ROUTE';
+    this.wrongTime=0; this.recoverT=-99; this.dirTo=[1,0]; this.dRoute=0; this.dGraph=0;
+  }
+  node(x,y){
+    const k=x+','+y; if(this._key.has(k)) return this._key.get(k);
+    const n={id:this.nodes.length,x,y,adj:[]}; this.nodes.push(n); this._key.set(k,n); return n;
+  }
+  edge(a,b,street){
+    const e={a,b,len:hyp(a.x-b.x,a.y-b.y),street}; this.edges.push(e); a.adj.push({n:b,e}); b.adj.push({n:a,e});
+  }
+  build(){
+    for(const s of STREETS){
+      const ts=new Set([s.from,s.to]);
+      for(const o of STREETS){
+        if(o.axis===s.axis) continue;
+        if(o.pos<s.from||o.pos>s.to) continue;
+        if(s.pos<o.from||s.pos>o.to) continue;
+        ts.add(o.pos);
+      }
+      for(const x of EXTRA) if(x.street===s.id) ts.add(x.t);
+      const arr=[...ts].sort((a,b)=>a-b);
+      for(let i=0;i<arr.length-1;i++){
+        const p=t=>s.axis==='h'?[t,s.pos]:[s.pos,t];
+        const [ax,ay]=p(arr[i]), [bx,by]=p(arr[i+1]);
+        this.edge(this.node(ax,ay), this.node(bx,by), s);
+      }
+    }
+    this.edge(this.node(APPROACH.x,APPROACH.y), this.node(DOOR.x,DOOR.y), null); // entrance stub
+  }
+  precompute(){ // Dijkstra from the door (single fixed goal)
+    const N=this.nodes.length; this.dg=new Array(N).fill(Infinity); this.nxt=new Array(N).fill(null);
+    this.dg[this.door.id]=0; const done=new Array(N).fill(false);
+    for(let k=0;k<N;k++){
+      let u=-1; for(let i=0;i<N;i++) if(!done[i]&&(u<0||this.dg[i]<this.dg[u])) u=i;
+      if(u<0||this.dg[u]===Infinity) break; done[u]=true;
+      for(const {n,e} of this.nodes[u].adj){
+        const nd=this.dg[u]+e.len; if(nd<this.dg[n.id]){this.dg[n.id]=nd; this.nxt[n.id]=this.nodes[u];}
+      }
+    }
+  }
+  nearestEdge(x,y){
+    let best=null;
+    for(const e of this.edges){
+      const p=projSeg(x,y,e.a.x,e.a.y,e.b.x,e.b.y);
+      if(!best||p.d<best.d) best={edge:e,...p};
+    }
+    return best;
+  }
+  streetHalfWidthAt(ne){ return ne.edge.street? ne.edge.street.hw : 12; }
+  planFrom(p){
+    const ne=this.nearestEdge(p.x,p.y); const {a,b}=ne.edge;
+    const ca=hyp(p.x-a.x,p.y-a.y)+this.dg[a.id], cb=hyp(p.x-b.x,p.y-b.y)+this.dg[b.id];
+    let n=ca<=cb?a:b; const raw=[];
+    while(n){ raw.push({x:n.x,y:n.y}); if(n===this.door) break; n=this.nxt[n.id]; }
+    // collapse collinear waypoints so each waypoint is a real decision point
+    const wps=[]; for(let i=0;i<raw.length;i++){
+      if(i>0&&i<raw.length-1){
+        const p0=raw[i-1],p1=raw[i],p2=raw[i+1];
+        const d1=norm(p1.x-p0.x,p1.y-p0.y), d2=norm(p2.x-p1.x,p2.y-p1.y);
+        if(d1[0]*d2[0]+d1[1]*d2[1]>0.99) continue;
+      }
+      wps.push(raw[i]);
+    }
+    this.route={wps,i:0,start:{x:p.x,y:p.y}};
+    this.wrongTime=0; this.raw='ON_ROUTE'; this.state='ON_ROUTE';
+  }
+  nextWaypoint(){ return this.route?this.route.wps[this.route.i]:null; }
+  remaining(){ return this.route?this.route.wps.slice(this.route.i):[]; }
+  // classify every frame. pos {x,y}, vel [vx,vy] px/s
+  update(pos,vel,dt,now){
+    const ev={advanced:false,replanned:false,recovered:false,arrived:false};
+    if(!this.route) return ev;
+    if(hyp(pos.x-DOOR.x,pos.y-DOOR.y)<=ARRIVE_R){ if(this.state!=='ARRIVED') ev.arrived=true; this.state='ARRIVED'; this.raw='ARRIVED'; return ev; }
+    const r=this.route;
+    // monotonic waypoint commitment: only ever advance
+    while(r.i<r.wps.length-1){
+      const w=r.wps[r.i], n=r.wps[r.i+1];
+      const pj=projSeg(pos.x,pos.y,w.x,w.y,n.x,n.y);
+      if(hyp(pos.x-w.x,pos.y-w.y)<16 || (pj.t>0.03&&pj.d<20)){ r.i++; ev.advanced=true; } else break;
+    }
+    const wp=r.wps[r.i];
+    this.dirTo=norm(wp.x-pos.x,wp.y-pos.y);
+    // corridor = segment into current waypoint + segment out of it
+    // the incoming segment extends backward along the same street (up to the drift limit): walking back
+    // along the right street is WRONG_DIRECTION by velocity, not "off the corridor"
+    const prev=r.i>0?r.wps[r.i-1]:r.start;
+    const back=norm(prev.x-wp.x,prev.y-wp.y), L=hyp(prev.x-wp.x,prev.y-wp.y)+DRIFT_REPLAN;
+    let dRoute=projSeg(pos.x,pos.y,wp.x,wp.y,wp.x+back[0]*L,wp.y+back[1]*L).d;
+    if(r.i+1<r.wps.length){ const n=r.wps[r.i+1]; dRoute=Math.min(dRoute,projSeg(pos.x,pos.y,wp.x,wp.y,n.x,n.y).d); }
+    const ne=this.nearestEdge(pos.x,pos.y); this.dGraph=ne.d; this.dRoute=dRoute;
+    const speed=hyp(vel[0],vel[1]); const moving=speed>15;
+    let raw;
+    if(ne.d>this.streetHalfWidthAt(ne)+10) raw='OFF_ROUTE';                        // left the street graph
+    else if(dRoute>28) raw='WRONG_DIRECTION';                                       // on a street, but not the committed one
+    else if(moving && (vel[0]*this.dirTo[0]+vel[1]*this.dirTo[1])/speed<-0.35) raw='WRONG_DIRECTION'; // right street, walking away
+    else raw='ON_ROUTE';
+    if(raw==='ON_ROUTE'){ if(this.raw!=='ON_ROUTE'&&this.raw!=='RECOVERED'){ this.recoverT=now; ev.recovered=true; } this.wrongTime=0; }
+    else this.wrongTime+=dt;
+    let st=raw; if(raw==='ON_ROUTE' && now-this.recoverT<2.0) st='RECOVERED';
+    this.raw=raw; this.state=st;
+    // drifted too far: replan from here rather than dragging the walker back through a committed junction
+    if(dRoute>DRIFT_REPLAN){ this.planFrom(pos); ev.replanned=true; }
+    return ev;
+  }
+}
+
+/* =====================================================================
+   GUIDANCE LAYER — phrases only. Never computes routes.
+   ===================================================================== */
+const STYLE_ORDER=['cardinal','relative','landmark'];
+const STYLE_INFO={
+  cardinal:{zh:'方位',short:'北',en:'cardinal',curiosity:'信我，這次聽方位。',curEn:'Trust me, listen for north.'},
+  relative:{zh:'左右',short:'左右',en:'relative',curiosity:'信我，這次用左右。',curEn:'Trust me, left and right this time.'},
+  landmark:{zh:'地標',short:'地標',en:'landmark',curiosity:'信我，我們看地標。',curEn:'Trust me, we follow the landmarks.'},
+};
+const Guidance={
+  cardinal(q){
+    const [dx,dy]=q.dirTo; let zh,en;
+    if(Math.abs(dx)>Math.abs(dy)){ zh=dx>0?'東':'西'; en=dx>0?'east':'west'; } else { zh=dy>0?'南':'北'; en=dy>0?'south':'north'; }
+    return {style:'cardinal', zh:(q.cont?'繼續':'')+`往${zh}走`, en:(q.cont?'Keep heading ':'Head ')+en};
+  },
+  relative(q){
+    const a=signedAngle(q.facing[0],q.facing[1],q.dirTo[0],q.dirTo[1]);
+    if(Math.abs(a)<35) return {style:'relative', zh:q.cont?'繼續直直往前走':'直直往前走', en:q.cont?'Keep going straight':'Go straight ahead'};
+    if(Math.abs(a)>145) return {style:'relative', zh:'轉身往回走', en:'Turn around and walk back'};
+    return a>0?{style:'relative', zh:'往你的右手邊', en:'To your right'}:{style:'relative', zh:'往你的左手邊', en:'To your left'};
+  },
+  landmark(q){
+    let best=null;
+    for(const lm of LANDMARKS){
+      if(!lm.guide) continue;
+      const vx=lm.x-q.pos.x, vy=lm.y-q.pos.y, d=hyp(vx,vy); if(d<22||d>200) continue;
+      const ahead=(vx*q.dirTo[0]+vy*q.dirTo[1])/d; if(ahead<0.4) continue;   // near AND ahead along the way
+      if(!best||d<best.d) best={lm,d,vx,vy};
+    }
+    if(!best){ const r=Guidance.relative(q); r.fallback=true; return r; }  // recorded under relative, never landmark
+    const a=signedAngle(q.facing[0],q.facing[1],best.vx,best.vy); const abs=Math.abs(a), side=a>0?'右':'左', sideEn=a>0?'right':'left';
+    let sec,secEn;
+    if(abs<20){sec='正前方';secEn='straight ahead';}
+    else if(abs<80){sec=side+'前方';secEn=`ahead on your ${sideEn}`;}
+    else if(abs<115){sec=side+'手邊';secEn=`on your ${sideEn}`;}
+    else {sec=side+'後方';secEn=`behind you on the ${sideEn}`;}
+    return {style:'landmark', zh:`${best.lm.name}在你的${sec}，跟著燈光走`, en:`${best.lm.en} is ${secEn} — follow the lights`, landmark:best.lm};
+  },
+  phrase(style,q){ return Guidance[style](q); }
+};
+
+/* =====================================================================
+   USER MODEL — per-style trials, 3-strike AVOIDED, sticky preference,
+   deterministic curiosity every 5th instruction
+   ===================================================================== */
+class UserModel{
+  constructor(){
+    this.m={}; for(const s of STYLE_ORDER) this.m[s]={trials:0,success:0,streak:0,avoided:false,evidence:''};
+    this.preferred='cardinal'; this.count=0;
+  }
+  rate(s){const m=this.m[s];return m.trials?m.success/m.trials:0;}
+  score(s){const m=this.m[s];return (m.success+1)/(m.trials+2);}
+  live(){return STYLE_ORDER.filter(s=>!this.m[s].avoided);}
+  best(){ const L=this.live(); let b=L[0]; for(const s of L) if(this.score(s)>this.score(b)+1e-9) b=s; return b; }
+  choose(){ // returns {style, curiosity}
+    this.count++;
+    if(this.live().length===0){ // total dead end: give the best-scoring style one more chance
+      const b=STYLE_ORDER.slice().sort((a,c)=>this.score(c)-this.score(a))[0];
+      this.m[b].avoided=false; this.m[b].streak=0; this.preferred=b;
+      return {style:b,curiosity:false,reprieve:true};
+    }
+    if(this.m[this.preferred].avoided) this.preferred=this.best();
+    if(this.count%5===0){
+      // least-used live style; on a tie prefer one that is NOT the current preference, so curiosity actually shows something new
+      const L=this.live().slice().sort((a,b)=>(this.m[a].trials-this.m[b].trials)||((a===this.preferred)-(b===this.preferred))||(STYLE_ORDER.indexOf(a)-STYLE_ORDER.indexOf(b)));
+      const least=L[0];
+      return {style:least,curiosity:true};
+    }
+    return {style:this.preferred,curiosity:false};
+  }
+  record(style,ok){
+    const m=this.m[style]; m.trials++;
+    if(ok){ m.success++; m.streak=0; return {switched:false}; }
+    m.streak++;
+    if(m.streak>=3&&!m.avoided){
+      m.avoided=true; m.evidence=`${STYLE_INFO[style].short} ×3 連續失敗 → AVOIDED`;
+      const was=this.preferred; if(this.preferred===style||this.m[this.preferred].avoided) this.preferred=this.best();
+      return {switched:true,from:style,to:this.preferred,wasPreferred:was===style};
+    }
+    return {switched:false};
+  }
+}
+
+/* =====================================================================
+   AUDIO + VOICE
+   ===================================================================== */
+const Sfx={
+  ctx:null, muted:false,
+  ensure(){ if(!this.ctx){ try{ this.ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(this.ctx&&this.ctx.state==='suspended') this.ctx.resume(); },
+  tone(f0,f1,t0,dur,gain,type='sine',cut=1800){
+    const c=this.ctx; const o=c.createOscillator(), g=c.createGain(), f=c.createBiquadFilter();
+    o.type=type; o.frequency.setValueAtTime(f0,t0); o.frequency.exponentialRampToValueAtTime(f1,t0+dur);
+    f.type='lowpass'; f.frequency.value=cut;
+    g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(gain,t0+0.04); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    o.connect(f); f.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0+dur+0.05);
+  },
+  hoot(){ this.ensure(); if(!this.ctx||this.muted) return; const t=this.ctx.currentTime+0.02;
+    this.tone(540,400,t,0.30,0.16,'sine',1200); this.tone(500,360,t+0.36,0.42,0.14,'sine',1200); },
+  chime(){ this.ensure(); if(!this.ctx||this.muted) return; const t=this.ctx.currentTime+0.02;
+    [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=>{ this.tone(f,f*0.995,t+i*0.13,1.4,0.11,'sine',4000); this.tone(f*2,f*2,t+i*0.13,0.5,0.03,'triangle',6000); }); },
+};
+const Voice={
+  voice:null, muted:false,
+  pick(){ if(!('speechSynthesis' in window)) return; const vs=speechSynthesis.getVoices();
+    this.voice=vs.find(v=>/zh[-_]TW/i.test(v.lang))||vs.find(v=>/zh[-_]Hant/i.test(v.lang))||vs.find(v=>/^zh/i.test(v.lang))||null; },
+  say(text,interrupt=false){
+    if(!('speechSynthesis' in window)||this.muted) return;
+    if(interrupt) speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text); u.lang='zh-TW'; if(this.voice) u.voice=this.voice;
+    u.pitch=1.15; u.rate=1.0; u.volume=1; speechSynthesis.speak(u);
+  },
+  stop(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
+};
+if('speechSynthesis' in window){ Voice.pick(); speechSynthesis.onvoiceschanged=()=>Voice.pick(); }
+
+/* =====================================================================
+   RENDERER
+   ===================================================================== */
+const bg=document.createElement('canvas'); bg.width=W*DPR; bg.height=H*DPR; const bctx=bg.getContext('2d'); bctx.setTransform(DPR,0,0,DPR,0,0);
+
+function rrect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+function glow(c,x,y,r,color,a){ const g=c.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,color.replace('A',a)); g.addColorStop(1,color.replace('A',0)); c.fillStyle=g; c.fillRect(x-r,y-r,r*2,r*2); }
+
+function drawBuildings(c){
+  const rnd=mulberry32(20260920);
+  const xs=[[0,127],[153,367],[393,667],[693,W]];
+  const ys=[[0,97],[123,287],[313,482],[518,MRT_Y-8],[MRT_Y+8,H]];
+  const skip=(x,y,w,h)=>{ // don't stamp generic buildings over HNBK / Nanshan footprints
+    const hit=(R)=>x<R.x+R.w&&x+w>R.x&&y<R.y+R.h&&y+h>R.y; return hit(HNBK)||hit(NANSHAN);
+  };
+  for(const [x0,x1] of xs) for(const [y0,y1] of ys){
+    if(y0>=H) continue;
+    const bw=x1-x0, bh=y1-y0; const n=1+Math.floor(rnd()*3);
+    let cx=x0+6;
+    for(let k=0;k<n;k++){
+      const w=Math.max(30,(bw-12)/n-6+rnd()*10); const h=Math.max(28,bh*(0.45+rnd()*0.5)); const y=y0+6+(bh-12-h)*rnd();
+      if(cx+w>x1-6) break;
+      if(!skip(cx,y,w,h)){
+        c.fillStyle=`hsl(${222+rnd()*10},${28+rnd()*10}%,${9+rnd()*5}%)`; rrect(c,cx,y,w,h,3); c.fill();
+        c.strokeStyle='rgba(120,140,190,.12)'; c.lineWidth=1; c.stroke();
+        // warm windows
+        const cols=Math.floor(w/9), rows=Math.floor(h/10);
+        for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){
+          const r=rnd(); if(r<0.55) continue;
+          c.fillStyle=r>0.9?'rgba(255,214,140,.75)':r>0.75?'rgba(255,190,110,.45)':'rgba(255,205,140,.22)';
+          c.fillRect(cx+5+i*9,y+5+j*10,4,5);
+        }
+      }
+      cx+=w+8;
+    }
+  }
+}
+function drawStreets(c){
+  for(const s of STREETS){
+    c.fillStyle='#232a38';
+    if(s.axis==='h') c.fillRect(s.from,s.pos-s.hw,s.to-s.from,s.hw*2); else c.fillRect(s.pos-s.hw,s.from,s.hw*2,s.to-s.from);
+    // curbs
+    c.strokeStyle='rgba(255,220,170,.10)'; c.lineWidth=1; c.beginPath();
+    if(s.axis==='h'){ c.moveTo(s.from,s.pos-s.hw+.5); c.lineTo(s.to,s.pos-s.hw+.5); c.moveTo(s.from,s.pos+s.hw-.5); c.lineTo(s.to,s.pos+s.hw-.5); }
+    else { c.moveTo(s.pos-s.hw+.5,s.from); c.lineTo(s.pos-s.hw+.5,s.to); c.moveTo(s.pos+s.hw-.5,s.from); c.lineTo(s.pos+s.hw-.5,s.to); }
+    c.stroke();
+    // center dashes
+    c.setLineDash([8,10]); c.strokeStyle='rgba(255,255,255,.07)'; c.beginPath();
+    if(s.axis==='h'){ c.moveTo(s.from,s.pos); c.lineTo(s.to,s.pos); } else { c.moveTo(s.pos,s.from); c.lineTo(s.pos,s.to); }
+    c.stroke(); c.setLineDash([]);
+  }
+  // street lamps (soft pools of light)
+  for(const s of STREETS){
+    const len=s.to-s.from; for(let t=s.from+45;t<s.to;t+=110){ const [x,y]=s.axis==='h'?[t,s.pos-s.hw-2]:[s.pos+s.hw+2,t]; glow(c,x,y,26,'rgba(255,205,130,A)',0.10); }
+  }
+  // crosswalk stripes at junctions
+  c.fillStyle='rgba(255,255,255,.18)';
+  const cross=(x,y,horizStreetHW,vertHW)=>{
+    for(let i=-vertHW+3;i<vertHW-2;i+=6){ c.fillRect(x+i,y-horizStreetHW-9,3,7); c.fillRect(x+i,y+horizStreetHW+2,3,7); }
+    for(let j=-horizStreetHW+3;j<horizStreetHW-2;j+=6){ c.fillRect(x-vertHW-9,y+j,7,3); c.fillRect(x+vertHW+2,y+j,7,3); }
+  };
+  cross(380,500,18,14); cross(140,500,18,13); cross(680,500,18,13); cross(380,300,13,14); cross(680,300,13,13); cross(140,300,13,13);
+  // MRT red line beneath Xinyi Rd
+  c.strokeStyle='#e4002b'; c.lineWidth=4; c.beginPath(); c.moveTo(0,MRT_Y); c.lineTo(W,MRT_Y); c.stroke();
+  c.strokeStyle='rgba(228,0,43,.25)'; c.lineWidth=12; c.stroke();
+  // station
+  c.fillStyle='#0b0f1a'; rrect(c,560-40,MRT_Y-9,80,18,9); c.fill(); c.strokeStyle='#e4002b'; c.lineWidth=2; c.stroke();
+  c.fillStyle='#fff'; c.font='600 11px system-ui,sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('象山站 R02',560,MRT_Y);
+  // exit stairs connecting line
+  for(const e of EXITS){ c.strokeStyle='rgba(228,0,43,.35)'; c.lineWidth=2; c.setLineDash([3,3]); c.beginPath(); c.moveTo(e.x,MRT_Y-8); c.lineTo(e.x,526); c.stroke(); c.setLineDash([]); }
+}
+function drawHNBK(c){
+  const B=HNBK;
+  c.fillStyle='#161f33'; rrect(c,B.x,B.y,B.w,B.h,4); c.fill(); c.strokeStyle='#3a4c72'; c.lineWidth=1.5; c.stroke();
+  // window grid
+  for(let i=0;i<16;i++) for(let j=0;j<12;j++){ const rn=((i*7+j*13)%10); if(rn<4) continue; c.fillStyle=rn>8?'rgba(255,225,160,.75)':'rgba(255,210,140,.35)'; c.fillRect(B.x+10+i*9,B.y+16+j*10,4,5); }
+  // lobby gold glow
+  glow(c,LM.lobby.x,LM.lobby.y,70,'rgba(255,200,90,A)',0.35);
+  // entrance canopy on the Songren Rd side
+  c.fillStyle='#ffd27a'; c.fillRect(B.x-3,DOOR.y-9,8,18);
+  c.fillStyle='#fff3c4'; c.fillRect(B.x-1,DOOR.y-5,4,10);
+  glow(c,DOOR.x,DOOR.y,34,'rgba(255,220,130,A)',0.55);
+  // steps to the street
+  c.fillStyle='rgba(255,220,150,.25)'; c.fillRect(APPROACH.x+14,DOOR.y-7,B.x-3-(APPROACH.x+14),14);
+}
+function drawNanshan(c){
+  const B=NANSHAN;
+  c.fillStyle='#10192b'; c.beginPath(); c.moveTo(B.x,B.y+B.h); c.lineTo(B.x,B.y+30); c.lineTo(B.x+B.w*0.55,B.y); c.lineTo(B.x+B.w,B.y+40); c.lineTo(B.x+B.w,B.y+B.h); c.closePath(); c.fill();
+  c.strokeStyle='#3f5a8a'; c.lineWidth=1.5; c.stroke();
+  for(let i=0;i<15;i++) for(let j=0;j<11;j++){ const rn=((i*5+j*11)%9); if(rn<3) continue; const x=B.x+12+i*10, y=B.y+44+j*9; c.fillStyle=rn>7?'rgba(200,230,255,.8)':'rgba(170,205,255,.35)'; c.fillRect(x,y,4,5); }
+  // crown light
+  glow(c,B.x+B.w*0.55,B.y+6,40,'rgba(150,200,255,A)',0.5);
+  c.fillStyle='#cfe6ff'; c.beginPath(); c.arc(B.x+B.w*0.55,B.y+4,3,0,Math.PI*2); c.fill();
+}
+function drawIcon(c,lm){
+  const {x,y}=lm;
+  switch(lm.type){
+    case 'exit':
+      glow(c,x,y,28,'rgba(255,90,110,A)',0.35);
+      c.fillStyle='#e4002b'; rrect(c,x-10,y-8,20,16,3); c.fill(); c.strokeStyle='#fff'; c.lineWidth=1; c.stroke();
+      c.fillStyle='#fff'; c.font='700 11px system-ui,sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(String(lm.n),x,y+0.5); break;
+    case 'seven':
+      glow(c,x,y,34,'rgba(255,140,60,A)',0.5);
+      c.fillStyle='#0f1522'; rrect(c,x-10,y-10,20,20,3); c.fill();
+      c.fillStyle='#f37021'; c.fillRect(x-8,y-8,16,5); c.fillStyle='#008061'; c.fillRect(x-8,y-2.5,16,5); c.fillStyle='#ee1c25'; c.fillRect(x-8,y+3,16,5); break;
+    case 'family':
+      glow(c,x,y,34,'rgba(60,200,255,A)',0.45);
+      c.fillStyle='#0f1522'; rrect(c,x-10,y-10,20,20,3); c.fill();
+      c.fillStyle='#00a0e9'; c.fillRect(x-8,y-8,16,8); c.fillStyle='#fff'; c.fillRect(x-8,y,16,2); c.fillStyle='#00a040'; c.fillRect(x-8,y+2,16,6); break;
+    case 'starbucks':
+      glow(c,x,y,34,'rgba(60,220,140,A)',0.45);
+      c.fillStyle='#00704a'; c.beginPath(); c.arc(x,y,10,0,Math.PI*2); c.fill();
+      c.strokeStyle='#fff'; c.lineWidth=1.5; c.beginPath(); c.arc(x,y,6.5,0,Math.PI*2); c.stroke();
+      c.fillStyle='#fff'; c.beginPath(); c.arc(x,y,2.6,0,Math.PI*2); c.fill(); break;
+    case 'youbike':
+      glow(c,x,y,34,'rgba(255,220,60,A)',0.45);
+      c.fillStyle='#f7c600'; c.beginPath(); c.arc(x,y,10,0,Math.PI*2); c.fill();
+      c.strokeStyle='#222'; c.lineWidth=1.5; c.beginPath(); c.arc(x-4,y+2.5,3,0,Math.PI*2); c.arc(x+4,y+2.5,3,0,Math.PI*2); c.stroke();
+      c.beginPath(); c.moveTo(x-4,y+2.5); c.lineTo(x-1,y-3); c.lineTo(x+3,y-3); c.lineTo(x+4,y+2.5); c.moveTo(x-1,y-3); c.lineTo(x+1,y+2.5); c.stroke(); break;
+    case 'zebra':
+      glow(c,x,y,30,'rgba(255,255,255,A)',0.22);
+      c.fillStyle='rgba(255,255,255,.85)'; for(let j=-8;j<=8;j+=4) c.fillRect(x-14,y+j-1,28,2.2); break;
+    case 'musha':
+      glow(c,x,y,40,'rgba(200,140,255,A)',0.4);
+      c.fillStyle='#1a1630'; rrect(c,x-16,y-24,32,48,3); c.fill(); c.strokeStyle='#8a66c8'; c.lineWidth=1; c.stroke();
+      for(let i=0;i<3;i++) for(let j=0;j<5;j++){ c.fillStyle=((i+j)%3===0)?'rgba(255,220,170,.8)':'rgba(255,200,150,.35)'; c.fillRect(x-11+i*9,y-19+j*9,4,5); }
+      c.fillStyle='#c8a4ff'; c.beginPath(); c.arc(x,y-26,2,0,Math.PI*2); c.fill(); break;
+    case 'lobby':
+      c.fillStyle='#ffe9a8'; c.beginPath(); c.arc(x,y,5,0,Math.PI*2); c.fill();
+      c.strokeStyle='rgba(255,220,130,.8)'; c.lineWidth=1.2; c.beginPath(); c.arc(x,y,9,0,Math.PI*2); c.stroke();
+      c.fillStyle='#8a6a30'; c.fillRect(x-1,y+5,2,7); break;
+    case 'nanshan': break; // drawn as a building
+    case 'door': break;    // drawn with HNBK
+    case 'hnbklabel': break;
+  }
+}
+function buildStatic(){
+  const c=bctx; c.clearRect(0,0,W,H);
+  const g=c.createLinearGradient(0,0,0,H); g.addColorStop(0,'#0a0e1a'); g.addColorStop(1,'#080b14'); c.fillStyle=g; c.fillRect(0,0,W,H);
+  // faint block texture
+  c.fillStyle='rgba(255,255,255,.015)'; for(let i=0;i<W;i+=24) for(let j=0;j<H;j+=24) if((i+j)%48===0) c.fillRect(i,j,12,12);
+  drawStreets(c); drawBuildings(c); drawNanshan(c); drawHNBK(c);
+  for(const lm of LANDMARKS) drawIcon(c,lm);
+  // fixed street labels
+  c.textBaseline='middle'; c.fillStyle='rgba(230,225,210,.85)';
+  const vlabel=(name,x,y0)=>{ c.font='600 13px "Noto Sans TC","PingFang TC",sans-serif'; c.textAlign='center'; [...name].forEach((ch,i)=>c.fillText(ch,x,y0+i*15)); };
+  vlabel('松智路',140,22); vlabel('松仁路',380,22); vlabel('松勇路',680,22);
+  c.textAlign='left'; c.font='600 13px "Noto Sans TC","PingFang TC",sans-serif';
+  c.fillText('松高路',8,110); c.fillText('松壽路',8,300); c.fillText('信義路五段',8,500);
+  c.font='10px system-ui,sans-serif'; c.fillStyle='rgba(200,200,210,.6)'; c.fillText('Xinyi Rd. Sec. 5',82,500); c.fillText('Songshou Rd.',54,300); c.fillText('Songgao Rd.',54,110);
+  c.fillStyle='rgba(255,120,140,.9)'; c.font='600 11px "Noto Sans TC","PingFang TC",sans-serif'; c.fillText('捷運淡水信義線 · Tamsui–Xinyi Line',8,588);
+}
+const STREET_LABEL_RECTS=[[130,10,20,50],[370,10,20,50],[670,10,20,50],[6,102,60,16],[6,292,120,16],[6,492,150,16],[6,580,200,16],[518,MRT_Y-10,84,20]];
+
+/* label layout — keeps labels off each other, the route line and moving characters */
+const LabelLayout={
+  measured:false, cache:new Map(), frame:0,
+  measure(){
+    ctx.font='600 13px "Noto Sans TC","PingFang TC",sans-serif';
+    for(const lm of LANDMARKS){ const zw=ctx.measureText(lm.name).width; ctx.font='10px system-ui,sans-serif'; const ew=ctx.measureText(lm.en).width; ctx.font='600 13px "Noto Sans TC","PingFang TC",sans-serif';
+      lm._w=Math.max(zw,ew)+6; lm._h=28; }
+    this.measured=true;
+  },
+  rectFor(lm,cand){
+    const w=lm._w,h=lm._h,x=lm.x,y=lm.y, o=lm.type==='musha'?20:14;
+    switch(cand){
+      case 'r': return [x+o,y-h/2,w,h];
+      case 'l': return [x-o-w,y-h/2,w,h];
+      case 'a': return [x-w/2,y-o-h+2,w,h];
+      case 'b': return [x-w/2,y+o-2,w,h];
+      case 'in': return [x-w/2,y-h/2,w,h];
+      case 'c': return [x-w/2,y-h/2,w,h];
+    }
+  },
+  hit(r,q){ return r[0]<q[0]+q[2]&&r[0]+r[2]>q[0]&&r[1]<q[1]+q[3]&&r[1]+r[3]>q[1]; },
+  segHit(r,ax,ay,bx,by){ const n=Math.ceil(hyp(bx-ax,by-ay)/5)||1; for(let i=0;i<=n;i++){ const x=ax+(bx-ax)*i/n,y=ay+(by-ay)*i/n; if(x>r[0]-3&&x<r[0]+r[2]+3&&y>r[1]-3&&y<r[1]+r[3]+3) return true; } return false; },
+  layout(routePts,boxes){
+    if(!this.measured) this.measure();
+    const placed=[...STREET_LABEL_RECTS];
+    const icons=LANDMARKS.filter(l=>l.type!=='hnbklabel'&&l.type!=='nanshan').map(l=>[l.x-11,l.y-11,22,22]);
+    const order=LANDMARKS.slice().sort((a,b)=>(a.type==='hnbklabel'?-1:0)-(b.type==='hnbklabel'?-1:0));
+    for(const lm of order){
+      let best=null,bestPen=1e9;
+      for(const cand of lm.cands){
+        const r=this.rectFor(lm,cand); let pen=0;
+        for(const q of placed) if(this.hit(r,q)) pen+=10;
+        for(const q of icons) if(this.hit(r,q)&&!(Math.abs(q[0]+11-lm.x)<1&&Math.abs(q[1]+11-lm.y)<1)) pen+=4;
+        for(const q of boxes) if(this.hit(r,q)) pen+=6;
+        for(let i=0;i<routePts.length-1;i++) if(this.segHit(r,routePts[i].x,routePts[i].y,routePts[i+1].x,routePts[i+1].y)){ pen+=5; break; }
+        if(r[0]<2||r[1]<2||r[0]+r[2]>W-2||r[1]+r[3]>H-2) pen+=3;
+        if(pen<bestPen){bestPen=pen;best={cand,r};}
+        if(pen===0) break;
+      }
+      placed.push(best.r); this.cache.set(lm.id,best);
+    }
+  },
+  draw(c,highlightId){
+    for(const lm of LANDMARKS){
+      const p=this.cache.get(lm.id); if(!p) continue; const [x,y,w,h]=p.r;
+      const hi=lm.id===highlightId;
+      c.fillStyle=hi?'rgba(30,26,10,.85)':'rgba(8,11,20,.72)'; rrect(c,x,y,w,h,5); c.fill();
+      if(hi){ c.strokeStyle='rgba(255,210,122,.9)'; c.lineWidth=1; c.stroke(); }
+      c.textAlign='left'; c.textBaseline='alphabetic';
+      c.font=(lm.type==='hnbklabel'?'700 13px':'600 13px')+' "Noto Sans TC","PingFang TC",sans-serif';
+      c.fillStyle=hi?'#ffe4a8':(lm.type==='hnbklabel'?'#ffd27a':'#e8e4d8'); c.fillText(lm.name,x+3,y+13);
+      c.font='10px system-ui,sans-serif'; c.fillStyle='rgba(180,190,210,.85)'; c.fillText(lm.en,x+3,y+24);
+    }
+  }
+};
+
+function drawOwl(c,o){
+  c.save(); c.translate(o.x,o.y);
+  c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(5,16,11,5,0,0,Math.PI*2); c.fill();
+  c.rotate(o.ang+Math.PI/2);
+  const f=Math.sin(o.flap); const sw=o.hard?1.0:0.6;
+  // wings
+  for(const s of [-1,1]){ c.save(); c.translate(s*8,3); c.rotate(s*(0.25+sw*0.5*f)); c.fillStyle='#5b3a1e'; c.beginPath(); c.ellipse(s*(9+3*f),0,12+3*Math.abs(f),5.2,0,0,Math.PI*2); c.fill();
+    c.strokeStyle='rgba(255,220,180,.25)'; c.lineWidth=1; c.beginPath(); c.moveTo(s*4,1); c.lineTo(s*(17+3*f),1); c.stroke(); c.restore(); }
+  // body
+  c.fillStyle='#7a4a26'; c.beginPath(); c.ellipse(0,5,11,12,0,0,Math.PI*2); c.fill();
+  c.fillStyle='#c79b63'; c.beginPath(); c.ellipse(0,7,6.5,8,0,0,Math.PI*2); c.fill();
+  c.fillStyle='#8a5a30'; for(let i=0;i<5;i++){ c.beginPath(); c.arc(-3+ (i%3)*3, 3+Math.floor(i/3)*4+ (i%2), 0.9,0,Math.PI*2); c.fill(); }
+  // head
+  c.fillStyle='#8b5630'; c.beginPath(); c.arc(0,-6,9.6,0,Math.PI*2); c.fill();
+  // ear tufts
+  c.fillStyle='#6a3f1f'; c.beginPath(); c.moveTo(-6,-12); c.lineTo(-11,-21); c.lineTo(-2,-14.5); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(6,-12); c.lineTo(11,-21); c.lineTo(2,-14.5); c.closePath(); c.fill();
+  // facial discs + amber eyes
+  c.fillStyle='#d9b382'; c.beginPath(); c.arc(-4.2,-6.5,4.8,0,Math.PI*2); c.arc(4.2,-6.5,4.8,0,Math.PI*2); c.fill();
+  c.fillStyle='#f6b331'; c.beginPath(); c.arc(-4.2,-6.5,3.7,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(4.2,-6.5,3.7,0,Math.PI*2); c.fill();
+  c.fillStyle='#1a0f08'; c.beginPath(); c.arc(-4.2,-6.8,1.8,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(4.2,-6.8,1.8,0,Math.PI*2); c.fill();
+  c.fillStyle='#fff'; c.beginPath(); c.arc(-3.4,-7.6,0.7,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(5,-7.6,0.7,0,Math.PI*2); c.fill();
+  // beak
+  c.fillStyle='#e07b2a'; c.beginPath(); c.moveTo(0,-1.2); c.lineTo(-1.8,-4.2); c.lineTo(1.8,-4.2); c.closePath(); c.fill();
+  c.restore();
+}
+function drawPlayer(c,p){
+  c.fillStyle='rgba(0,0,0,.4)'; c.beginPath(); c.ellipse(p.x+1,p.y+6,7,3.2,0,0,Math.PI*2); c.fill();
+  glow(c,p.x,p.y,22,'rgba(120,200,255,A)',0.22);
+  c.fillStyle='#4f8ff7'; c.beginPath(); c.arc(p.x,p.y,6.5,0,Math.PI*2); c.fill();
+  c.strokeStyle='rgba(255,255,255,.35)'; c.lineWidth=1; c.stroke();
+  c.fillStyle='#f2d3b1'; c.beginPath(); c.arc(p.x+p.fx*2.2,p.y+p.fy*2.2,3.8,0,Math.PI*2); c.fill();
+  c.fillStyle='#2b1d14'; c.beginPath(); c.arc(p.x-p.fx*0.8,p.y-p.fy*0.8,3.2,0,Math.PI*2); c.fill(); // hair, behind facing
+}
+
+/* =====================================================================
+   GAME CONTROLLER
+   ===================================================================== */
+const engine=new NavEngine();
+const model=new UserModel();
+const banner=document.getElementById('banner'), bZh=banner.querySelector('.zh'), bEn=banner.querySelector('.en');
+const badge=document.getElementById('badge');
+const BADGE={ON_ROUTE:'ON ROUTE 在路上',WRONG_DIRECTION:'WRONG DIRECTION 走錯方向',OFF_ROUTE:'OFF ROUTE 偏離路線',RECOVERED:'RECOVERED 回到路上',ARRIVED:'ARRIVED 抵達'};
+
+const G={
+  t:0, last:performance.now(),
+  player:{x:330,y:500,fx:0,fy:-1,vx:0,vy:0},
+  owl:{x:330,y:470,ang:-Math.PI/2,flap:0,hard:false},
+  trail:[], particles:[], powderUntil:-1,
+  trip:null, trips:[], trial:null, instr:null,
+  pending:[], correctionUntil:-1, lastCorrection:-99, lastRecoveryLine:-99, banner:{zh:'',en:''},
+  auto:false, walker:{mode:'idle',dir:[0,0],style:null}, instrSeq:0,
+  log:[], keys:new Set(), pointer:{down:false,x:0,y:0},
+  uiDirty:true,
+};
+function schedule(delay,fn){ G.pending.push({t:G.t+delay,fn}); }
+function clearPending(){ G.pending.length=0; }
+function addLog(text,kind){ G.log.unshift({t:G.t,text,kind}); if(G.log.length>40) G.log.length=40; G.uiDirty=true; }
+function setBanner(zh,en,cls){ G.banner={zh,en}; bZh.textContent=zh; bEn.textContent=en; banner.className=cls||''; }
+
+/* ---- trips ---- */
+function startTrip(exitIdx){
+  const e=EXITS[exitIdx];
+  const p=G.player; p.x=e.x; p.y=500; p.fx=0; p.fy=-1; p.vx=p.vy=0;
+  G.owl.x=e.x; G.owl.y=478; G.owl.ang=-Math.PI/2;
+  G.trail.length=0; G.trial=null; G.instr=null; clearPending(); G.correctionUntil=-1; G.lastCorrection=-99;
+  G.walker={mode:'idle',dir:[0,0],style:null};
+  engine.planFrom(p);
+  G.trip={n:G.trips.length+1,exit:e.n,t0:G.t,wrong:0,done:false,replans:0};
+  Voice.stop();
+  setBanner('跟我走，我知道路。','Follow me, I know the way.','');
+  Voice.say('跟我走，我知道路。',true);
+  addLog(`旅程 #${G.trip.n} 從象山站出口${e.n}出發，偏好風格：${STYLE_INFO[model.preferred].zh}`,'');
+  schedule(1.4,()=>prepareInstruction({}));
+  G.uiDirty=true;
+}
+function finishTrip(){
+  const tr=G.trip; if(!tr||tr.done) return;
+  tr.done=true; tr.time=G.t-tr.t0; tr.pref=model.preferred;
+  G.trips.push(tr); if(G.trial){G.trial=null;} clearPending();
+  setBanner('到了。收工！','We\'re here. That\'s a wrap!','arrived');
+  Voice.say('到了。收工！',true); Sfx.chime();
+  addLog(`抵達 華南銀行國際會議中心 入口 — 用時 ${tr.time.toFixed(1)}s，走錯 ${tr.wrong} 次`,'arrive');
+  burst(); G.powderUntil=G.t+4;
+  if(G.auto){ G.auto=false; btnAuto.classList.remove('on'); btnAuto.textContent='迷路觀光客 自動走'; }
+  G.uiDirty=true;
+}
+
+/* ---- instructions & trials ---- */
+function query(cont){
+  const p=G.player; return {pos:{x:p.x,y:p.y},facing:[p.fx,p.fy],dirTo:engine.dirTo,cont:!!cont};
+}
+function prepareInstruction({cont=false,correction=false}={}){
+  if(!G.trip||G.trip.done||engine.state==='ARRIVED') return;
+  const pick=model.choose();
+  if(pick.reprieve) addLog(`三種都不行，再給「${STYLE_INFO[pick.style].zh}」一次機會`,'switch');
+  if(pick.curiosity){
+    const info=STYLE_INFO[pick.style];
+    addLog(`試試${info.zh}…（好奇心 curiosity）`,'cur');
+    const zh=(correction?'走錯囉，沒關係！':'')+info.curiosity;
+    setBanner(zh,(correction?'Wrong way — no worries! ':'')+info.curEn,correction?'correct':'');
+    Voice.say(zh,correction); if(correction) G.correctionUntil=G.t+2.2;
+    schedule(1.4,()=>deliver(pick.style,{cont,curiosity:true,correction}));
+  } else deliver(pick.style,{cont,correction});
+}
+function deliver(style,{cont=false,correction=false,curiosity=false}={}){
+  if(!G.trip||G.trip.done||engine.state==='ARRIVED') return;
+  const q=query(cont); const ph=Guidance.phrase(style,q);
+  if(ph.fallback) addLog('附近沒有可用地標，改用左右（記在左右，不記地標）','');
+  const zh=(correction?'走錯囉，沒關係！':'')+ph.zh, en=(correction?'Wrong way — no worries! ':'')+ph.en;
+  setBanner(zh,en,correction?'correct':'');
+  Voice.say(zh,correction);
+  G.instr={style:ph.style,requested:style,zh,en,t:G.t,landmark:ph.landmark||null,curiosity,correction}; G.instrSeq++;
+  // a human who has not touched the controls yet is not evidence: the 3.5s clock arms on first movement. The auto-walker is measured strictly.
+  G.trial={style:ph.style,delivered:ph.style,t0:G.t,x0:q.pos.x,y0:q.pos.y,dir:[...q.dirTo],wp:engine.route.i,landmark:ph.landmark||null,armed:G.auto};
+  if(correction) G.correctionUntil=G.t+2.2;
+  engine.wrongTime=0; // a fresh instruction gets a fresh ~1s grace before any wrong-way interrupt
+  // lost tourist decides how to react to this style
+  if(G.auto) walkerReact(ph.style);
+  G.uiDirty=true;
+}
+function resolveTrial(ok,why){
+  const tr=G.trial; if(!tr) return {switched:false}; G.trial=null;
+  const res=model.record(tr.style,ok);
+  if(!ok) addLog(`${STYLE_INFO[tr.style].zh}指令失敗（${why}）— 連續 ${model.m[tr.style].streak} 次`,'fail');
+  if(res.switched){
+    addLog(`${STYLE_INFO[res.from].short} ×3 失敗 → 改用${STYLE_INFO[res.to].short}`,'switch');
+    Sfx.hoot();
+  }
+  G.uiDirty=true; return res;
+}
+function afterFail(res,{correction=false}={}){
+  if(res.switched){
+    const zh=(correction?'走錯囉，沒關係！':'')+'好吧，我換種方式。';
+    setBanner(zh,(correction?'Wrong way — no worries! ':'')+'Alright, let me try another way.',correction?'correct':'');
+    Voice.say(zh,true); if(correction) G.correctionUntil=G.t+2.2;
+    schedule(1.4,()=>prepareInstruction({correction:false}));
+  } else prepareInstruction({correction});
+}
+function doCorrection(){
+  if(!G.trip||G.trip.done) return;
+  G.lastCorrection=G.t; G.trip.wrong++; engine.wrongTime=-2.0; // re-arm ~3s later if still wrong
+  clearPending();
+  const res=G.trial?resolveTrial(false,'走錯方向'):{switched:false};
+  afterFail(res,{correction:true});
+}
+
+/* ---- lost tourist (auto-walker) ---- */
+function walkable(x,y){ const ne=engine.nearestEdge(x,y); return ne.d<engine.streetHalfWidthAt(ne)-2 && x>4&&x<W-4&&y>4&&y<H-4; }
+function walkerReact(style){
+  const w=G.walker; w.style=style;
+  if(style==='cardinal'){ // ignores cardinal words: takes a wrong turn instead
+    const [dx,dy]=engine.dirTo; const p=G.player;
+    const cands=[[-dx,-dy],[-dy,dx],[dy,-dx]]; const rot=model.count%3; const ordered=cands.slice(rot).concat(cands.slice(0,rot));
+    w.mode='idle'; for(const d of ordered){ if(walkable(p.x+d[0]*26,p.y+d[1]*26)){ w.dir=d; w.mode='wander'; break; } }
+  } else w.mode='follow';
+}
+function walkerVelocity(dt){
+  const w=G.walker, p=G.player;
+  if(w.mode==='follow'){ const wp=engine.nextWaypoint(); if(!wp) return [0,0]; const [dx,dy]=norm(wp.x-p.x,wp.y-p.y); return [dx*130,dy*130]; }
+  if(w.mode==='wander'){ if(!walkable(p.x+w.dir[0]*14,p.y+w.dir[1]*14)){ w.mode='idle'; return [0,0]; } return [w.dir[0]*75,w.dir[1]*75]; }
+  return [0,0];
+}
+
+/* ---- particles ---- */
+function burst(){
+  const cols=['#ffd54a','#ffc107','#ffe58a','#f5b32b','#fff3c4','#e6a817'];
+  for(let i=0;i<170;i++){
+    const a=-Math.PI/2+(Math.random()-0.5)*2.4, sp=160+Math.random()*300;
+    G.particles.push({x:DOOR.x,y:DOOR.y,vx:Math.cos(a)*sp-40,vy:Math.sin(a)*sp,rot:Math.random()*6.28,vr:(Math.random()-0.5)*14,w:4+Math.random()*5,h:2+Math.random()*4,color:cols[i%cols.length],life:3.2+Math.random()*0.8,age:0,kind:'confetti'});
+  }
+}
+function updateParticles(dt){
+  if(G.t<G.powderUntil) for(let i=0;i<7;i++) G.particles.push({x:Math.random()*W,y:-4,vx:(Math.random()-0.5)*30,vy:70+Math.random()*90,rot:0,vr:0,w:1+Math.random()*1.8,h:0,color:'#ffd98a',life:9,age:0,kind:'powder'});
+  for(const p of G.particles){
+    p.age+=dt; p.vy+= (p.kind==='confetti'?520:40)*dt; p.vx*= (1-1.2*dt); p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt;
+  }
+  G.particles=G.particles.filter(p=>p.age<p.life&&p.y<H+10);
+}
+function drawParticles(c){
+  for(const p of G.particles){
+    const a=p.kind==='confetti'?clamp((p.life-p.age)/1.0,0,1):clamp(1-(p.y/H),0.05,0.9);
+    c.globalAlpha=a;
+    if(p.kind==='confetti'){ c.save(); c.translate(p.x,p.y); c.rotate(p.rot); c.fillStyle=p.color; c.fillRect(-p.w/2,-p.h/2,p.w,p.h); c.restore(); }
+    else { c.fillStyle=p.color; c.beginPath(); c.arc(p.x,p.y,p.w,0,Math.PI*2); c.fill(); }
+  }
+  c.globalAlpha=1;
+}
+
+/* ---- input ---- */
+window.addEventListener('keydown',e=>{ const k=e.key.toLowerCase(); if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){ G.keys.add(k); e.preventDefault(); Sfx.ensure(); } });
+window.addEventListener('keyup',e=>G.keys.delete(e.key.toLowerCase()));
+function toMap(e){ const r=canvas.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H}; }
+canvas.addEventListener('pointerdown',e=>{ G.pointer.down=true; Object.assign(G.pointer,toMap(e)); canvas.setPointerCapture(e.pointerId); Sfx.ensure(); });
+canvas.addEventListener('pointermove',e=>{ if(G.pointer.down) Object.assign(G.pointer,toMap(e)); });
+const endPtr=e=>{G.pointer.down=false;}; canvas.addEventListener('pointerup',endPtr); canvas.addEventListener('pointercancel',endPtr);
+function humanVelocity(){
+  let dx=0,dy=0; const K=G.keys;
+  if(K.has('arrowup')||K.has('w')) dy-=1; if(K.has('arrowdown')||K.has('s')) dy+=1; if(K.has('arrowleft')||K.has('a')) dx-=1; if(K.has('arrowright')||K.has('d')) dx+=1;
+  if(dx||dy){ const [nx,ny]=norm(dx,dy); return [nx*140,ny*140]; }
+  if(G.pointer.down){ const vx=G.pointer.x-G.player.x, vy=G.pointer.y-G.player.y; const d=hyp(vx,vy); if(d>5){ const s=Math.min(140,d*6); return [vx/d*s,vy/d*s]; } }
+  return [0,0];
+}
+
+/* ---- UI buttons ---- */
+const btnTrip=document.getElementById('btnTrip'), btnAuto=document.getElementById('btnAuto'), btnMute=document.getElementById('btnMute'), exitSel=document.getElementById('exitSel');
+function pickExit(){ const v=+exitSel.value; return v>=0?v:Math.floor(Math.random()*3); }
+btnTrip.onclick=()=>{ Sfx.ensure(); startTrip(pickExit()); };
+btnAuto.onclick=()=>{ Sfx.ensure(); G.auto=!G.auto; btnAuto.classList.toggle('on',G.auto); btnAuto.textContent=G.auto?'停止自動走 Stop':'迷路觀光客 自動走';
+  if(G.auto){ if(G.trial){G.trial.armed=true; G.trial.t0=G.t;} if(!G.trip||G.trip.done) startTrip(pickExit()); else if(G.instr) walkerReact(G.instr.style); } else G.walker.mode='idle'; };
+btnMute.onclick=()=>{ const m=!Voice.muted; Voice.muted=m; Sfx.muted=m; if(m) Voice.stop(); btnMute.textContent=m?'🔇 靜音':'🔊 語音'; btnMute.classList.toggle('on',m); };
+
+/* ---- side panel ---- */
+const stylesEl=document.getElementById('styles'), logEl=document.getElementById('log'), tripsBody=document.querySelector('#trips tbody');
+function renderPanel(){
+  let h='';
+  for(const s of STYLE_ORDER){
+    const m=model.m[s], info=STYLE_INFO[s]; const rate=m.trials?Math.round(100*m.success/m.trials):0;
+    const tags=(model.preferred===s&&!m.avoided?'<span class="tag pref">偏好 PREFERRED</span>':'')+(m.avoided?'<span class="tag avoid">AVOIDED</span>':'')+(G.trial&&G.trial.style===s?'<span class="tag cur">測試中</span>':'');
+    h+=`<div class="style"><div class="row"><span><b>${info.zh}</b> <span style="color:var(--dim);font-size:11px">${info.en}</span>${tags}</span><span>${m.success}/${m.trials} 次 · ${m.trials?rate+'%':'—'}</span></div>
+      <div class="bar${m.avoided?' avoid':''}"><i style="width:${m.trials?rate:0}%"></i></div><div class="ev">${m.evidence||(m.streak?`連續失敗 ${m.streak}/3`:'')}</div></div>`;
+  }
+  stylesEl.innerHTML=h;
+  logEl.innerHTML=G.log.slice(0,14).map(l=>`<li class="${l.kind}"><time>${fmtT(l.t)}</time>${l.text}</li>`).join('');
+  const first=G.trips[0];
+  tripsBody.innerHTML=G.trips.map((t,i)=>{ const better=i>0&&first&&t.time<first.time; return `<tr class="${better?'better':''}"><td>${t.n}</td><td>出口${t.exit}</td><td class="num">${t.time.toFixed(1)}s</td><td class="num">${t.wrong}</td><td>${STYLE_INFO[t.pref].zh}${better?' ✓ 更快':''}</td></tr>`; }).join('')
+    +(G.trip&&!G.trip.done?`<tr><td>${G.trip.n}</td><td>出口${G.trip.exit}</td><td class="num">${(G.t-G.trip.t0).toFixed(0)}s…</td><td class="num">${G.trip.wrong}</td><td style="color:var(--dim)">進行中</td></tr>`:'');
+  G.uiDirty=false;
+}
+
+/* ---- main loop ---- */
+let frame=0, uiTick=0;
+function step(now){
+  requestAnimationFrame(step);
+  let dt=(now-G.last)/1000; G.last=now; dt=clamp(dt,0,0.05); G.t+=dt; frame++;
+  const p=G.player;
+  // pending timed events
+  for(let i=0;i<G.pending.length;i++) if(G.pending[i].t<=G.t){ const ev=G.pending.splice(i,1)[0]; i--; ev.fn(); }
+  // movement
+  let v=[0,0]; const active=G.trip&&!G.trip.done;
+  if(active){ v=G.auto?walkerVelocity(dt):humanVelocity(); }
+  const ox=p.x, oy=p.y;
+  p.x=clamp(p.x+v[0]*dt,4,W-4); p.y=clamp(p.y+v[1]*dt,4,H-4);
+  for(const B of SOLID){ // buildings are solid — the entrance must be reached from Songren Rd
+    const inside=(x,y)=>x>B.x-6&&x<B.x+B.w+6&&y>B.y-6&&y<B.y+B.h+6;
+    if(inside(p.x,p.y)){ if(!inside(ox,p.y)) p.x=ox; else if(!inside(p.x,oy)) p.y=oy; else { p.x=ox; p.y=oy; } }
+  }
+  const ivx=(p.x-ox)/Math.max(dt,1e-3), ivy=(p.y-oy)/Math.max(dt,1e-3);
+  p.vx+= (ivx-p.vx)*Math.min(1,dt*12); p.vy+=(ivy-p.vy)*Math.min(1,dt*12);
+  const sp=hyp(p.vx,p.vy); if(sp>12){ const [fx,fy]=norm(p.vx,p.vy); p.fx=fx; p.fy=fy; }
+  if(hyp(p.x-ox,p.y-oy)>1.5){ G.trail.push({x:p.x,y:p.y,t:G.t}); }
+  while(G.trail.length&&G.t-G.trail[0].t>14) G.trail.shift();
+
+  // navigation truth
+  if(active){
+    const ev=engine.update(p,[p.vx,p.vy],dt,G.t);
+    if(ev.arrived){ finishTrip(); }
+    else{
+      if(ev.replanned){ G.trip.replans++; addLog('偏離超過 250px，從目前位置重新規劃（不回頭走已通過的路口）',''); clearPending(); G.trial=null; if(G.auto) G.walker.mode='idle'; prepareInstruction({}); }
+      if(ev.recovered && G.t-G.lastRecoveryLine>6){ G.lastRecoveryLine=G.t; Voice.say('回來就好，不丟臉。',false); addLog('回到路上 — 「回來就好，不丟臉。」',''); }
+      // trial measurement
+      const tr=G.trial;
+      if(tr){
+        if(!tr.armed && (sp>12||G.auto)){ tr.armed=true; tr.t0=G.t; }
+        const prog=(p.x-tr.x0)*tr.dir[0]+(p.y-tr.y0)*tr.dir[1];
+        const dwp=hyp(engine.nextWaypoint().x-p.x,engine.nextWaypoint().y-p.y);
+        if(ev.advanced||prog>=26){
+          resolveTrial(true,'');
+          if(ev.advanced) prepareInstruction({});                       // new decision point → new instruction
+          else if(dwp>70){ const seq=G.instrSeq; schedule(2.5,()=>{ if(G.instrSeq===seq&&!G.trial) prepareInstruction({cont:true}); }); } // long straight: next trial after a breath
+        } else if(tr.armed && G.t-tr.t0>3.5){
+          const res=resolveTrial(false,'3.5 秒內沒有往正確方向移動'); afterFail(res,{});
+        }
+      } else if(ev.advanced && !G.pending.length){ prepareInstruction({}); }
+      // ~1s wrong-way interrupt
+      if(engine.wrongTime>=1.0 && G.t-G.lastCorrection>2.5) doCorrection();
+    }
+  }
+  // owl
+  const o=G.owl; const wp=engine.nextWaypoint(); const d=engine.dirTo;
+  let tx,ty; const correcting=G.t<G.correctionUntil;
+  if(engine.state==='ARRIVED'||!active){ tx=DOOR.x+22+Math.sin(G.t*1.3)*6; ty=DOOR.y-30+Math.cos(G.t*1.7)*4; if(!active&&!G.trips.length){tx=p.x+30;ty=p.y-28;} }
+  else if(correcting){ const k=(Math.sin(G.t*7)+1)/2; tx=p.x+d[0]*(18+56*k); ty=p.y+d[1]*(18+56*k)-6; }
+  else { tx=p.x+d[0]*48+Math.sin(G.t*2.1)*5; ty=p.y+d[1]*48-10+Math.cos(G.t*1.6)*5; }
+  const lerp=Math.min(1,dt*(correcting?9:5)); o.x+=(tx-o.x)*lerp; o.y+=(ty-o.y)*lerp;
+  const want=active&&engine.state!=='ARRIVED'?Math.atan2(d[1],d[0]):Math.atan2(p.y-o.y,p.x-o.x); let da=want-o.ang; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; o.ang+=da*Math.min(1,dt*6);
+  o.hard=correcting; o.flap+=dt*(correcting?22:(sp>20?11:6));
+  updateParticles(dt);
+
+  /* ---- draw ---- */
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H); ctx.drawImage(bg,0,0,W,H);
+  // breathing lobby & door glow
+  const br=0.5+0.5*Math.sin(G.t*1.4); glow(ctx,LM.lobby.x,LM.lobby.y,60,'rgba(255,200,90,A)',0.12+0.14*br); glow(ctx,DOOR.x,DOOR.y,28,'rgba(255,225,140,A)',0.25+0.25*br);
+  // arrival radius hint (subtle)
+  ctx.strokeStyle='rgba(255,220,130,.28)'; ctx.setLineDash([2,4]); ctx.lineWidth=1; ctx.beginPath(); ctx.arc(DOOR.x,DOOR.y,ARRIVE_R,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  // trail
+  if(G.trail.length>1){ ctx.lineWidth=1.6; ctx.lineCap='round'; for(let i=1;i<G.trail.length;i++){ const a=G.trail[i]; const age=G.t-a.t; ctx.strokeStyle=`rgba(190,235,255,${clamp(0.55*(1-age/14),0,0.55)})`; ctx.beginPath(); ctx.moveTo(G.trail[i-1].x,G.trail[i-1].y); ctx.lineTo(a.x,a.y); ctx.stroke(); } }
+  // route line (remaining committed route)
+  let routePts=[];
+  if(active&&engine.route){
+    routePts=[{x:p.x,y:p.y},...engine.remaining()];
+    ctx.save(); ctx.shadowColor='rgba(94,224,255,.7)'; ctx.shadowBlur=10; ctx.strokeStyle='rgba(94,224,255,.55)'; ctx.lineWidth=2; ctx.setLineDash([6,8]); ctx.lineDashOffset=-G.t*40;
+    ctx.beginPath(); ctx.moveTo(routePts[0].x,routePts[0].y); for(const q of routePts.slice(1)) ctx.lineTo(q.x,q.y); ctx.stroke(); ctx.restore();
+    // waypoint markers
+    for(const q of engine.remaining()){ ctx.fillStyle='rgba(94,224,255,.7)'; ctx.beginPath(); ctx.arc(q.x,q.y,3,0,Math.PI*2); ctx.fill(); }
+    // next waypoint ring
+    if(wp){ ctx.strokeStyle='rgba(94,224,255,.6)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(wp.x,wp.y,8+2*Math.sin(G.t*4),0,Math.PI*2); ctx.stroke(); }
+  }
+  // referenced landmark pulse ring
+  const hl=G.trial&&G.trial.landmark?G.trial.landmark:null;
+  if(hl){ for(let k=0;k<3;k++){ const ph=((G.t*0.9+k/3)%1); ctx.strokeStyle=`rgba(255,210,122,${(1-ph)*0.8})`; ctx.lineWidth=2.5-ph*1.5; ctx.beginPath(); ctx.arc(hl.x,hl.y,12+ph*34,0,Math.PI*2); ctx.stroke(); } glow(ctx,hl.x,hl.y,50,'rgba(255,210,122,A)',0.25); }
+  // correction beam from the owl toward the right way
+  if(correcting&&active){ ctx.save(); ctx.strokeStyle='rgba(255,200,90,.9)'; ctx.lineWidth=2.5; ctx.setLineDash([4,7]); ctx.lineDashOffset=-G.t*90; ctx.shadowColor='rgba(255,200,90,.8)'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.moveTo(o.x,o.y); ctx.lineTo(o.x+d[0]*130,o.y+d[1]*130); ctx.stroke(); ctx.restore();
+    // arrowhead
+    const ax=o.x+d[0]*130, ay=o.y+d[1]*130; ctx.fillStyle='rgba(255,200,90,.95)'; ctx.beginPath(); ctx.moveTo(ax+d[0]*10,ay+d[1]*10); ctx.lineTo(ax-d[1]*6,ay+d[0]*6); ctx.lineTo(ax+d[1]*6,ay-d[0]*6); ctx.closePath(); ctx.fill(); }
+  // characters
+  drawPlayer(ctx,p);
+  drawOwl(ctx,o);
+  // labels (re-layout every 6 frames against route + characters)
+  if(frame%6===0||!LabelLayout.cache.size){ LabelLayout.layout(routePts,[[p.x-12,p.y-12,24,24],[o.x-24,o.y-26,48,48]]); }
+  LabelLayout.draw(ctx,hl?hl.id:null);
+  drawParticles(ctx);
+
+  // badge + panel
+  const st=active?engine.state:(G.trip&&G.trip.done?'ARRIVED':'ON_ROUTE');
+  if(badge.className!==st){ badge.className=st; badge.textContent=BADGE[st]; }
+  if(G.t>=G.correctionUntil&&banner.classList.contains('correct')) banner.className='';
+  if(G.uiDirty||(++uiTick%30===0)) renderPanel();
+}
+buildStatic();
+startTrip(0);
+requestAnimationFrame(step);
+</script>
+</body>
+</html>
