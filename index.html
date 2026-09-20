@@ -20,7 +20,7 @@
   header h1 small{color:var(--dim);font-weight:400;font-size:12px;margin-left:8px}
   .spacer{flex:1}
   @media (max-width:1750px){header h1 small{display:none}}
-  @media (max-width:1400px){#badge{min-width:0}header button,header select{padding:6px 8px;font-size:12px}}
+  @media (max-width:1560px){#badge{min-width:0;font-size:12px}header button,header select{padding:5px 8px;font-size:12px}header{gap:8px}header h1{font-size:18px}}
   #badge{font-size:13px;font-weight:700;letter-spacing:1px;padding:5px 12px;border-radius:999px;
     background:#1a2a1e;color:var(--ok);border:1px solid currentColor;min-width:150px;text-align:center;transition:all .25s}
   #badge.WRONG_DIRECTION{background:#2a2110;color:var(--warn)}
@@ -42,14 +42,15 @@
   @keyframes flash{from{background:#2a1c0c}to{background:#141a2c}}
   main{display:flex;gap:14px;padding:0 18px 10px;flex:1;min-height:0}
   #stage{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;perspective:1500px;perspective-origin:50% 30%}
-  body.tilt canvas#map{transform:rotateX(30deg) translateY(-4%) scale(1.06);transform-origin:50% 60%;box-shadow:0 0 0 1px #1a2338,0 60px 80px rgba(0,0,0,.75)}
+  body.tilt canvas#map{transform:rotateX(28deg) translateY(-3%) scale(0.98);transform-origin:50% 60%;box-shadow:0 0 0 1px #1a2338,0 60px 80px rgba(0,0,0,.75)}
   canvas#map{transition:transform .6s ease}
   #stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0 1px,transparent 1px 3px);border-radius:14px}
   #stage{position:relative}
   header h1 span{text-shadow:0 0 14px rgba(255,210,122,.6),0 0 30px rgba(255,80,200,.25)}
   canvas#map{width:100%;max-height:100%;aspect-ratio:960/600;border-radius:14px;
     box-shadow:0 0 0 1px #1a2338,0 30px 60px rgba(0,0,0,.6);background:#0b0f1a;cursor:crosshair;touch-action:none;object-fit:contain}
-  aside#panel{width:352px;flex:none;display:flex;flex-direction:column;gap:8px;overflow:hidden;min-height:0}
+  aside#panel{width:352px;flex:none;display:flex;flex-direction:column;gap:8px;overflow:hidden;min-height:0;position:relative;z-index:2}
+  #stage{z-index:1}
   .card.grow{flex:1 1 auto;min-height:90px;display:flex;flex-direction:column}
   .card.fixed{flex:none}
   .card.grow ul#log{flex:1;min-height:0;max-height:none}
