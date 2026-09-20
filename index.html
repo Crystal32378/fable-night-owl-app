@@ -32,9 +32,9 @@
   button:hover{background:#1d2740}
   button.on{background:#2b2410;border-color:var(--gold);color:var(--gold)}
   #banner{margin:2px 18px 8px;padding:12px 22px;border-radius:14px;background:linear-gradient(180deg,#121a2c,#0d1320);
-    border:1px solid #223050;min-height:104px;display:flex;flex-direction:column;justify-content:center;
+    border:1px solid #223050;min-height:92px;display:flex;flex-direction:column;justify-content:center;
     box-shadow:0 0 40px rgba(94,224,255,.06) inset}
-  #banner .zh{font-size:46px;line-height:1.15;font-weight:700;color:var(--gold);letter-spacing:1px;text-shadow:0 0 22px rgba(255,210,122,.35)}
+  #banner .zh{font-size:42px;line-height:1.15;font-weight:700;color:var(--gold);letter-spacing:1px;text-shadow:0 0 22px rgba(255,210,122,.35)}
   #banner .en{font-size:20px;color:#b9c3d9;margin-top:4px;font-weight:400}
   #banner.correct{animation:flash .45s ease-in-out infinite alternate;border-color:var(--warn)}
   #banner.correct .zh{color:#ffc36b}
@@ -49,11 +49,14 @@
   header h1 span{text-shadow:0 0 14px rgba(255,210,122,.6),0 0 30px rgba(255,80,200,.25)}
   canvas#map{width:100%;max-height:100%;aspect-ratio:960/600;border-radius:14px;
     box-shadow:0 0 0 1px #1a2338,0 30px 60px rgba(0,0,0,.6);background:#0b0f1a;cursor:crosshair;touch-action:none;object-fit:contain}
-  aside#panel{width:352px;flex:none;display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  aside#panel{width:352px;flex:none;display:flex;flex-direction:column;gap:8px;overflow:hidden;min-height:0}
+  .card.grow{flex:1 1 auto;min-height:90px;display:flex;flex-direction:column}
+  .card.fixed{flex:none}
+  .card.grow ul#log{flex:1;min-height:0;max-height:none}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
   .card h3{margin:0 0 8px;font-size:14px;font-weight:600;letter-spacing:.5px}
   .card h3 span{color:var(--dim);font-weight:400;font-size:11px;margin-left:6px}
-  .style{margin-bottom:9px}
+  .style{margin-bottom:6px}
   .style .row{display:flex;justify-content:space-between;font-size:12.5px;align-items:baseline}
   .style .row b{font-size:13px}
   .style .row .tag{font-size:10px;font-weight:700;letter-spacing:1px;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
@@ -64,14 +67,16 @@
   .bar i{display:block;height:100%;background:linear-gradient(90deg,#3ddc84,#9be7b8);border-radius:4px;transition:width .4s}
   .bar.avoid i{background:linear-gradient(90deg,#ff5a5a,#b33)}
   .style .ev{font-size:11px;color:var(--dim);margin-top:3px;min-height:12px}
-  ul#log{list-style:none;margin:0;padding:0;font-size:12.5px;max-height:190px;overflow:auto}
+  ul#log{list-style:none;margin:0;padding:0;font-size:12px;overflow:auto}
   ul#log li{padding:3px 0;border-bottom:1px dashed #182036;color:#cfd6e6}
   ul#log li time{color:var(--dim);font-size:11px;margin-right:6px;font-variant-numeric:tabular-nums}
   ul#log li.switch{color:var(--warn)}
   ul#log li.cur{color:var(--info)}
   ul#log li.arrive{color:var(--gold)}
   ul#log li.fail{color:#ff9c9c}
+  #trips{display:block;max-height:150px;overflow:auto}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
+  #trips thead,#trips tbody,#trips tr{display:table;width:100%;table-layout:fixed}
   th,td{padding:4px 6px;text-align:left;border-bottom:1px solid #182036}
   th{color:var(--dim);font-weight:500;font-size:11px}
   tr.better td{background:#10301c;color:#9be7b8}
@@ -105,9 +110,9 @@
 <main>
   <div id="stage"><canvas id="map" width="960" height="600"></canvas></div>
   <aside id="panel">
-    <section class="card"><h3>飛寶的使用者模型 <span id="personaTag">how you understand directions</span></h3><div id="styles"></div></section>
-    <section class="card"><h3>證據紀錄 <span>evidence log</span></h3><ul id="log"></ul></section>
-    <section class="card"><h3>旅程報告 <span>trip report</span></h3>
+    <section class="card fixed"><h3>飛寶的使用者模型 <span id="personaTag">how you understand directions</span></h3><div id="styles"></div></section>
+    <section class="card grow"><h3>證據紀錄 <span>evidence log</span></h3><ul id="log"></ul></section>
+    <section class="card fixed"><h3>旅程報告 <span>trip report</span></h3>
       <table id="trips"><thead><tr><th>#</th><th>起點</th><th class="num">用時</th><th class="num">走錯</th><th>最後偏好</th></tr></thead><tbody></tbody></table>
     </section>
   </aside>
