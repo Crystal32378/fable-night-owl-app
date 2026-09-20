@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fable Night Owl 飛寶 · 信義夜行導引</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%230b0f1a'/%3E%3Cpath d='M14 18l8 10M50 18l-8 10' stroke='%236a3f1f' stroke-width='6' stroke-linecap='round'/%3E%3Cellipse cx='32' cy='38' rx='18' ry='20' fill='%237a4a26'/%3E%3Ccircle cx='32' cy='27' r='15' fill='%238b5630'/%3E%3Ccircle cx='25' cy='27' r='7' fill='%23f6b331'/%3E%3Ccircle cx='39' cy='27' r='7' fill='%23f6b331'/%3E%3Ccircle cx='25' cy='27' r='3.2' fill='%231a0f08'/%3E%3Ccircle cx='39' cy='27' r='3.2' fill='%231a0f08'/%3E%3Cpath d='M32 33l-3 5h6z' fill='%23e07b2a'/%3E%3Cellipse cx='32' cy='44' rx='9' ry='11' fill='%23c79b63'/%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#070a12; --card:#0e1320; --line:#1c2437; --text:#e8e4d8; --dim:#8a93a8;
@@ -43,6 +44,9 @@
   #stage{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;perspective:1500px;perspective-origin:50% 30%}
   body.tilt canvas#map{transform:rotateX(30deg) translateY(-4%) scale(1.06);transform-origin:50% 60%;box-shadow:0 0 0 1px #1a2338,0 60px 80px rgba(0,0,0,.75)}
   canvas#map{transition:transform .6s ease}
+  #stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px);mix-blend-mode:overlay;border-radius:14px}
+  #stage{position:relative}
+  header h1 span{text-shadow:0 0 14px rgba(255,210,122,.6),0 0 30px rgba(255,80,200,.25)}
   canvas#map{width:100%;max-height:100%;aspect-ratio:960/600;border-radius:14px;
     box-shadow:0 0 0 1px #1a2338,0 30px 60px rgba(0,0,0,.6);background:#0b0f1a;cursor:crosshair;touch-action:none;object-fit:contain}
   aside#panel{width:352px;flex:none;display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0}
@@ -385,9 +389,17 @@ class UserModel{
 /* =====================================================================
    AUDIO + VOICE
    ===================================================================== */
+const BGM={
+  el:null, ok:false, level:0.22,
+  init(){ if(this.el) return; const a=new Audio('bgm.mp3'); a.loop=true; a.volume=this.level; a.preload='auto';
+    a.addEventListener('canplaythrough',()=>{this.ok=true;},{once:true}); a.addEventListener('error',()=>{this.ok=false;}); this.el=a; },
+  start(){ this.init(); if(this.el&&!Sfx.muted) this.el.play().catch(()=>{}); },
+  duck(on){ if(!this.el) return; const target=on?this.level*0.3:this.level; const step=()=>{ const v=this.el.volume; const nv=v+(target-v)*0.35; this.el.volume=Math.abs(nv-target)<0.005?target:nv; if(this.el.volume!==target) requestAnimationFrame(step); }; step(); },
+  setMuted(m){ this.init(); if(m) this.el.pause(); else this.el.play().catch(()=>{}); }
+};
 const Sfx={
   ctx:null, muted:false,
-  ensure(){ if(!this.ctx){ try{ this.ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(this.ctx&&this.ctx.state==='suspended') this.ctx.resume(); },
+  ensure(){ if(!this.ctx){ try{ this.ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(this.ctx&&this.ctx.state==='suspended') this.ctx.resume(); BGM.start(); },
   tone(f0,f1,t0,dur,gain,type='sine',cut=1800){
     const c=this.ctx; const o=c.createOscillator(), g=c.createGain(), f=c.createBiquadFilter();
     o.type=type; o.frequency.setValueAtTime(f0,t0); o.frequency.exponentialRampToValueAtTime(f1,t0+dur);
@@ -410,7 +422,7 @@ const Voice={
     if(interrupt) speechSynthesis.cancel();
     const text=this.lang==='en'?(en||zh):zh;
     const u=new SpeechSynthesisUtterance(text.replace(/—/g,',')); u.lang=this.lang==='en'?'en-US':'zh-TW'; const v=this.lang==='en'?this.en:this.zh; if(v) u.voice=v;
-    u.pitch=1.12; u.rate=1.0; u.volume=1; speechSynthesis.speak(u);
+    u.pitch=1.12; u.rate=1.0; u.volume=1; BGM.duck(true); u.onend=u.onerror=()=>{ if(!speechSynthesis.speaking&&!speechSynthesis.pending) BGM.duck(false); }; speechSynthesis.speak(u);
   },
   stop(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
 };
@@ -519,8 +531,9 @@ function drawNanshan(c){
   c.fillStyle='#10192b'; c.beginPath(); c.moveTo(B.x,B.y+B.h); c.lineTo(B.x,B.y+30); c.lineTo(B.x+B.w*0.55,B.y); c.lineTo(B.x+B.w,B.y+40); c.lineTo(B.x+B.w,B.y+B.h); c.closePath(); c.fill();
   c.strokeStyle='#3f5a8a'; c.lineWidth=1.5; c.stroke();
   for(let i=0;i<15;i++) for(let j=0;j<11;j++){ const rn=((i*5+j*11)%9); if(rn<3) continue; const x=B.x+12+i*10, y=B.y+44+j*9; c.fillStyle=rn>7?'rgba(200,230,255,.8)':'rgba(170,205,255,.35)'; c.fillRect(x,y,4,5); }
-  // crown light
+  // crown light + neon edge (a hint of 2077)
   glow(c,B.x+B.w*0.55,B.y+6,40,'rgba(150,200,255,A)',0.5);
+  c.save(); c.shadowColor='rgba(0,255,240,.9)'; c.shadowBlur=12; c.strokeStyle='rgba(0,240,230,.75)'; c.lineWidth=1.5; c.beginPath(); c.moveTo(B.x,B.y+30); c.lineTo(B.x+B.w*0.55,B.y); c.lineTo(B.x+B.w,B.y+40); c.stroke(); c.restore();
   c.fillStyle='#cfe6ff'; c.beginPath(); c.arc(B.x+B.w*0.55,B.y+4,3,0,Math.PI*2); c.fill();
   c.restore();
 }
@@ -534,6 +547,7 @@ function drawIcon(c,lm){
     case 'seven':
       glow(c,x,y,34,'rgba(255,140,60,A)',0.5);
       c.fillStyle='#0f1522'; rrect(c,x-10,y-10,20,20,3); c.fill();
+      c.save(); c.shadowColor='rgba(0,255,240,.8)'; c.shadowBlur=8; c.strokeStyle='rgba(0,240,230,.6)'; c.lineWidth=1; rrect(c,x-10,y-10,20,20,3); c.stroke(); c.restore();
       c.fillStyle='#f37021'; c.fillRect(x-8,y-8,16,5); c.fillStyle='#008061'; c.fillRect(x-8,y-2.5,16,5); c.fillStyle='#ee1c25'; c.fillRect(x-8,y+3,16,5); break;
     case 'family':
       glow(c,x,y,34,'rgba(60,200,255,A)',0.45);
@@ -556,7 +570,8 @@ function drawIcon(c,lm){
       glow(c,x,y,40,'rgba(200,140,255,A)',0.4);
       c.fillStyle='#1a1630'; rrect(c,x-16,y-24,32,48,3); c.fill(); c.strokeStyle='#8a66c8'; c.lineWidth=1; c.stroke();
       for(let i=0;i<3;i++) for(let j=0;j<5;j++){ c.fillStyle=((i+j)%3===0)?'rgba(255,220,170,.8)':'rgba(255,200,150,.35)'; c.fillRect(x-11+i*9,y-19+j*9,4,5); }
-      c.fillStyle='#c8a4ff'; c.beginPath(); c.arc(x,y-26,2,0,Math.PI*2); c.fill(); break;
+      c.fillStyle='#c8a4ff'; c.beginPath(); c.arc(x,y-26,2,0,Math.PI*2); c.fill();
+      c.save(); c.shadowColor='rgba(255,60,200,.95)'; c.shadowBlur=10; c.strokeStyle='rgba(255,90,220,.85)'; c.lineWidth=1.5; c.strokeRect(x-16.5,y-24.5,33,49); c.fillStyle='rgba(255,90,220,.9)'; c.fillRect(x-12,y-22,24,2); c.restore(); break;
     case 'lobby':
       c.fillStyle='#ffe9a8'; c.beginPath(); c.arc(x,y,5,0,Math.PI*2); c.fill();
       c.strokeStyle='rgba(255,220,130,.8)'; c.lineWidth=1.2; c.beginPath(); c.arc(x,y,9,0,Math.PI*2); c.stroke();
@@ -854,6 +869,7 @@ function humanVelocity(){
   return [0,0];
 }
 
+window.addEventListener('pointerdown',()=>Sfx.ensure(),{once:true});
 /* ---- UI buttons ---- */
 const btnTrip=document.getElementById('btnTrip'), btnMute=document.getElementById('btnMute'), exitSel=document.getElementById('exitSel'), btn3d=document.getElementById('btn3d');
 const PERSONAS={
@@ -875,7 +891,7 @@ document.body.classList.add('tilt');
 function pickExit(){ const v=+exitSel.value; return v>=0?v:Math.floor(Math.random()*3); }
 btnTrip.onclick=()=>{ Sfx.ensure(); startTrip(pickExit()); };
 
-btnMute.onclick=()=>{ const m=!Voice.muted; Voice.muted=m; Sfx.muted=m; if(m) Voice.stop(); btnMute.textContent=m?'🔇':'🔊'; btnMute.classList.toggle('on',m); };
+btnMute.onclick=()=>{ const m=!Voice.muted; Voice.muted=m; Sfx.muted=m; BGM.setMuted(m); if(m) Voice.stop(); btnMute.textContent=m?'🔇':'🔊'; btnMute.classList.toggle('on',m); };
 
 /* ---- side panel ---- */
 const stylesEl=document.getElementById('styles'), logEl=document.getElementById('log'), tripsBody=document.querySelector('#trips tbody');
