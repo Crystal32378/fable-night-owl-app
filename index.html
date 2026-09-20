@@ -44,7 +44,7 @@
   #stage{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;perspective:1500px;perspective-origin:50% 30%}
   body.tilt canvas#map{transform:rotateX(30deg) translateY(-4%) scale(1.06);transform-origin:50% 60%;box-shadow:0 0 0 1px #1a2338,0 60px 80px rgba(0,0,0,.75)}
   canvas#map{transition:transform .6s ease}
-  #stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px);mix-blend-mode:overlay;border-radius:14px}
+  #stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0 1px,transparent 1px 3px);border-radius:14px}
   #stage{position:relative}
   header h1 span{text-shadow:0 0 14px rgba(255,210,122,.6),0 0 30px rgba(255,80,200,.25)}
   canvas#map{width:100%;max-height:100%;aspect-ratio:960/600;border-radius:14px;
@@ -97,7 +97,8 @@
   <button id="btnP2" class="persona" data-p="2">路痴旅客 2｜只認路標</button>
   <button id="btn3d" class="on">3D 視角</button>
   <button id="btnLang" title="語音語言">🗣 EN</button>
-  <button id="btnMute" title="靜音">🔊</button>
+  <button id="btnMute" title="語音靜音">🔊</button>
+  <button id="btnBgm" class="on" title="背景音樂開關">♫ BGM</button>
   <button id="btnReset" title="清空所有記憶">清空記憶</button>
 </header>
 <div id="banner"><div class="zh">跟我走，我知道路。</div><div class="en">Follow me, I know the way.</div></div>
@@ -243,6 +244,7 @@ class NavEngine{
     return best;
   }
   streetHalfWidthAt(ne){ return ne.edge.street? ne.edge.street.hw : 12; }
+  onStreet(x,y,margin=3){ for(const e of this.edges){ const hw=(e.street?e.street.hw:12)-margin; const p=projSeg(x,y,e.a.x,e.a.y,e.b.x,e.b.y); if(p.d<=hw) return true; } return false; }
   planFrom(p){
     const ne=this.nearestEdge(p.x,p.y); const {a,b}=ne.edge;
     const ca=hyp(p.x-a.x,p.y-a.y)+this.dg[a.id], cb=hyp(p.x-b.x,p.y-b.y)+this.dg[b.id];
@@ -356,7 +358,10 @@ class UserModel{
   rate(s){const m=this.m[s];return m.trials?m.success/m.trials:0;}
   score(s){const m=this.m[s];return (m.success+1)/(m.trials+2);}
   live(){return STYLE_ORDER.filter(s=>!this.m[s].avoided);}
-  best(){ const L=this.live(); let b=L[0]; for(const s of L) if(this.score(s)>this.score(b)+1e-9) b=s; return b; }
+  best(){ let L=this.live();
+    if(!L.length){ // every style struck out: give the best-scoring one a fresh chance
+      const b=STYLE_ORDER.slice().sort((a,c)=>this.score(c)-this.score(a))[0]; this.m[b].avoided=false; this.m[b].streak=0; this.m[b].evidence='再給一次機會'; L=[b]; }
+    let b=L[0]; for(const s of L) if(this.score(s)>this.score(b)+1e-9) b=s; return b; }
   choose(){ // returns {style, curiosity}
     this.count++;
     if(this.live().length===0){ // total dead end: give the best-scoring style one more chance
@@ -390,12 +395,12 @@ class UserModel{
    AUDIO + VOICE
    ===================================================================== */
 const BGM={
-  el:null, ok:false, level:0.22,
+  el:null, ok:false, level:0.18, enabled:true,
   init(){ if(this.el) return; const a=new Audio('bgm.mp3'); a.loop=true; a.volume=this.level; a.preload='auto';
     a.addEventListener('canplaythrough',()=>{this.ok=true;},{once:true}); a.addEventListener('error',()=>{this.ok=false;}); this.el=a; },
-  start(){ this.init(); if(this.el&&!Sfx.muted) this.el.play().catch(()=>{}); },
+  start(){ this.init(); if(this.el&&this.enabled) this.el.play().catch(()=>{}); },
+  toggle(){ this.init(); this.enabled=!this.enabled; if(this.enabled) this.el.play().catch(()=>{}); else this.el.pause(); return this.enabled; },
   duck(on){ if(!this.el) return; const target=on?this.level*0.3:this.level; const step=()=>{ const v=this.el.volume; const nv=v+(target-v)*0.35; this.el.volume=Math.abs(nv-target)<0.005?target:nv; if(this.el.volume!==target) requestAnimationFrame(step); }; step(); },
-  setMuted(m){ this.init(); if(m) this.el.pause(); else this.el.play().catch(()=>{}); }
 };
 const Sfx={
   ctx:null, muted:false,
@@ -812,7 +817,7 @@ function doCorrection(){
 }
 
 /* ---- lost tourist (auto-walker) ---- */
-function walkable(x,y){ const ne=engine.nearestEdge(x,y); return ne.d<engine.streetHalfWidthAt(ne)-2 && x>4&&x<W-4&&y>4&&y<H-4; }
+function walkable(x,y){ return engine.onStreet(x,y,3) && x>4&&x<W-4&&y>4&&y<H-4; }
 function walkerReact(style){
   const w=G.walker; w.style=style;
   const follows=G.persona?G.persona.follows:['relative','landmark'];
@@ -824,7 +829,9 @@ function walkerReact(style){
 }
 function walkerVelocity(dt){
   const w=G.walker, p=G.player;
-  if(w.mode==='follow'){ const wp=engine.nextWaypoint(); if(!wp) return [0,0]; const [dx,dy]=norm(wp.x-p.x,wp.y-p.y); return [dx*130,dy*130]; }
+  if(w.mode==='follow'){ const wp=engine.nextWaypoint(); if(!wp) return [0,0]; const dx=wp.x-p.x, dy=wp.y-p.y; const sx=Math.sign(dx), sy=Math.sign(dy);
+    let d; if(Math.abs(dx)<2) d=[0,sy]; else if(Math.abs(dy)<2) d=[sx,0]; else d=walkable(p.x+sx*10,p.y)?[sx,0]:[0,sy];
+    return [d[0]*130,d[1]*130]; }
   if(w.mode==='wander'){ if(!walkable(p.x+w.dir[0]*14,p.y+w.dir[1]*14)){ w.mode='idle'; return [0,0]; } return [w.dir[0]*75,w.dir[1]*75]; }
   return [0,0];
 }
@@ -891,7 +898,8 @@ document.body.classList.add('tilt');
 function pickExit(){ const v=+exitSel.value; return v>=0?v:Math.floor(Math.random()*3); }
 btnTrip.onclick=()=>{ Sfx.ensure(); startTrip(pickExit()); };
 
-btnMute.onclick=()=>{ const m=!Voice.muted; Voice.muted=m; Sfx.muted=m; BGM.setMuted(m); if(m) Voice.stop(); btnMute.textContent=m?'🔇':'🔊'; btnMute.classList.toggle('on',m); };
+document.getElementById('btnBgm').onclick=function(){ const on=BGM.toggle(); this.textContent=on?'♫ BGM':'♫ BGM 關'; this.classList.toggle('on',on); };
+btnMute.onclick=()=>{ const m=!Voice.muted; Voice.muted=m; Sfx.muted=m; if(m) Voice.stop(); btnMute.textContent=m?'🔇':'🔊'; btnMute.classList.toggle('on',m); };
 
 /* ---- side panel ---- */
 const stylesEl=document.getElementById('styles'), logEl=document.getElementById('log'), tripsBody=document.querySelector('#trips tbody');
@@ -923,7 +931,11 @@ function step(now){
   let v=[0,0]; const active=G.trip&&!G.trip.done;
   if(active){ v=G.auto?walkerVelocity(dt):humanVelocity(); }
   const ox=p.x, oy=p.y;
-  p.x=clamp(p.x+v[0]*dt,4,W-4); p.y=clamp(p.y+v[1]*dt,4,H-4);
+  { // streets only — no cutting through a block. Try the full step, then slide along one axis, else stay.
+    const canStand=(x,y)=>engine.onStreet(x,y,3);
+    const nx=clamp(p.x+v[0]*dt,4,W-4), ny=clamp(p.y+v[1]*dt,4,H-4);
+    if(canStand(nx,ny)){ p.x=nx; p.y=ny; } else if(canStand(nx,oy)){ p.x=nx; } else if(canStand(ox,ny)){ p.y=ny; }
+  }
   for(const B of SOLID){ // buildings are solid — the entrance must be reached from Songren Rd
     const inside=(x,y)=>x>B.x-6&&x<B.x+B.w+6&&y>B.y-6&&y<B.y+B.h+6;
     if(inside(p.x,p.y)){ if(!inside(ox,p.y)) p.x=ox; else if(!inside(p.x,oy)) p.y=oy; else { p.x=ox; p.y=oy; } }
