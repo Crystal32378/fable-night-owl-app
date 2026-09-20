@@ -92,7 +92,9 @@
   <button id="btnP1" class="persona" data-p="1">路痴旅客 1｜只懂左右</button>
   <button id="btnP2" class="persona" data-p="2">路痴旅客 2｜只認路標</button>
   <button id="btn3d" class="on">3D 視角</button>
-  <button id="btnMute" title="靜音">🔊 語音</button>
+  <button id="btnLang" title="語音語言">🗣 EN</button>
+  <button id="btnMute" title="靜音">🔊</button>
+  <button id="btnReset" title="清空所有記憶">清空記憶</button>
 </header>
 <div id="banner"><div class="zh">跟我走，我知道路。</div><div class="en">Follow me, I know the way.</div></div>
 <main>
@@ -399,14 +401,16 @@ const Sfx={
     [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=>{ this.tone(f,f*0.995,t+i*0.13,1.4,0.11,'sine',4000); this.tone(f*2,f*2,t+i*0.13,0.5,0.03,'triangle',6000); }); },
 };
 const Voice={
-  voice:null, muted:false,
+  voice:null, muted:false, lang:'en',
   pick(){ if(!('speechSynthesis' in window)) return; const vs=speechSynthesis.getVoices();
-    this.voice=vs.find(v=>/zh[-_]TW/i.test(v.lang))||vs.find(v=>/zh[-_]Hant/i.test(v.lang))||vs.find(v=>/^zh/i.test(v.lang))||null; },
-  say(text,interrupt=false){
+    this.zh=vs.find(v=>/zh[-_]TW/i.test(v.lang))||vs.find(v=>/zh[-_]Hant/i.test(v.lang))||vs.find(v=>/^zh/i.test(v.lang))||null;
+    this.en=vs.find(v=>/en[-_]US/i.test(v.lang)&&/Samantha|Ava|Allison|Google US/i.test(v.name))||vs.find(v=>/en[-_]US/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null; },
+  say(zh,en,interrupt=false){
     if(!('speechSynthesis' in window)||this.muted) return;
     if(interrupt) speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(text); u.lang='zh-TW'; if(this.voice) u.voice=this.voice;
-    u.pitch=1.15; u.rate=1.0; u.volume=1; speechSynthesis.speak(u);
+    const text=this.lang==='en'?(en||zh):zh;
+    const u=new SpeechSynthesisUtterance(text.replace(/—/g,',')); u.lang=this.lang==='en'?'en-US':'zh-TW'; const v=this.lang==='en'?this.en:this.zh; if(v) u.voice=v;
+    u.pitch=1.12; u.rate=1.0; u.volume=1; speechSynthesis.speak(u);
   },
   stop(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
 };
@@ -655,9 +659,13 @@ function drawOwl(c,o){
   c.beginPath(); c.moveTo(6,-12); c.lineTo(11,-21); c.lineTo(2,-14.5); c.closePath(); c.fill();
   // facial discs + amber eyes
   c.fillStyle='#d9b382'; c.beginPath(); c.arc(-4.2,-6.5,4.8,0,Math.PI*2); c.arc(4.2,-6.5,4.8,0,Math.PI*2); c.fill();
-  c.fillStyle='#f6b331'; c.beginPath(); c.arc(-4.2,-6.5,3.7,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(4.2,-6.5,3.7,0,Math.PI*2); c.fill();
-  c.fillStyle='#1a0f08'; c.beginPath(); c.arc(-4.2,-6.8,1.8,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(4.2,-6.8,1.8,0,Math.PI*2); c.fill();
-  c.fillStyle='#fff'; c.beginPath(); c.arc(-3.4,-7.6,0.7,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(5,-7.6,0.7,0,Math.PI*2); c.fill();
+  const blink=((o.t||0)%3.7)>3.55; // a quick blink every ~3.7s
+  if(blink){ c.strokeStyle='#5a3418'; c.lineWidth=1.6; c.beginPath(); c.moveTo(-7.5,-6.5); c.lineTo(-1,-6.5); c.moveTo(1,-6.5); c.lineTo(7.5,-6.5); c.stroke(); }
+  else{
+    c.fillStyle='#f6b331'; c.beginPath(); c.arc(-4.2,-6.5,3.7,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(4.2,-6.5,3.7,0,Math.PI*2); c.fill();
+    c.fillStyle='#1a0f08'; c.beginPath(); c.arc(-4.2,-6.8,1.8,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(4.2,-6.8,1.8,0,Math.PI*2); c.fill();
+    c.fillStyle='#fff'; c.beginPath(); c.arc(-3.4,-7.6,0.7,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(5,-7.6,0.7,0,Math.PI*2); c.fill();
+  }
   // beak
   c.fillStyle='#e07b2a'; c.beginPath(); c.moveTo(0,-1.2); c.lineTo(-1.8,-4.2); c.lineTo(1.8,-4.2); c.closePath(); c.fill();
   c.restore();
@@ -707,7 +715,7 @@ function startTrip(exitIdx){
   G.trip={n:G.trips.length+1,exit:e.n,t0:G.t,wrong:0,done:false,replans:0};
   Voice.stop();
   setBanner('跟我走，我知道路。','Follow me, I know the way.','');
-  Voice.say('跟我走，我知道路。',true);
+  Voice.say('跟我走，我知道路。','Follow me, I know the way.',true);
   addLog(`旅程 #${G.trip.n} 從象山站出口${e.n}出發，偏好風格：${STYLE_INFO[model.preferred].zh}`,'');
   schedule(1.4,()=>prepareInstruction({}));
   G.uiDirty=true;
@@ -717,9 +725,14 @@ function finishTrip(){
   tr.done=true; tr.time=G.t-tr.t0; tr.pref=model.preferred;
   G.trips.push(tr); if(G.trial){G.trial=null;} clearPending();
   setBanner('到了。收工！','We\'re here. That\'s a wrap!','arrived');
-  Voice.say('到了。收工！',true); Sfx.chime();
+  Voice.say('到了。收工！',"We're here. That's a wrap!",true); Sfx.chime();
   addLog(`抵達 華南銀行國際會議中心 入口 — 用時 ${tr.time.toFixed(1)}s，走錯 ${tr.wrong} 次`,'arrive');
   burst(); G.powderUntil=G.t+4;
+  const learned=model.preferred, L=STYLE_INFO[learned], avoided=STYLE_ORDER.filter(s=>model.m[s].avoided).map(s=>STYLE_INFO[s].zh);
+  const zh=`飛寶學到了：你靠「${L.zh}」認路${avoided.length?`，${avoided.join('、')}對你沒用`:''}。`;
+  const EN={cardinal:'compass directions',relative:'left and right',landmark:'landmarks'}; const avEn=STYLE_ORDER.filter(s=>model.m[s].avoided).map(s=>EN[s]);
+  const en=`Fable learned: you navigate by ${EN[learned]}${avEn.length?`. ${avEn.join(' and ')} didn't work for you`:''}.`;
+  schedule(2.6,()=>{ setBanner(zh,en,'arrived'); Voice.say(zh,en,false); addLog(zh,'arrive'); });
   if(G.auto){ G.auto=false; syncPersonaButtons(); }
   G.uiDirty=true;
 }
@@ -736,8 +749,8 @@ function prepareInstruction({cont=false,correction=false}={}){
     const info=STYLE_INFO[pick.style];
     addLog(`試試${info.zh}…（好奇心 curiosity）`,'cur');
     const zh=(correction?'走錯囉，沒關係！':'')+info.curiosity;
-    setBanner(zh,(correction?'Wrong way — no worries! ':'')+info.curEn,correction?'correct':'');
-    Voice.say(zh,correction); if(correction) G.correctionUntil=G.t+2.2;
+    const enC=(correction?'Wrong way — no worries! ':'')+info.curEn; setBanner(zh,enC,correction?'correct':'');
+    Voice.say(zh,enC,correction); if(correction) G.correctionUntil=G.t+2.2;
     schedule(1.4,()=>deliver(pick.style,{cont,curiosity:true,correction}));
   } else deliver(pick.style,{cont,correction});
 }
@@ -747,7 +760,7 @@ function deliver(style,{cont=false,correction=false,curiosity=false}={}){
   if(ph.fallback) addLog('附近沒有可用地標，改用左右（記在左右，不記地標）','');
   const zh=(correction?'走錯囉，沒關係！':'')+ph.zh, en=(correction?'Wrong way — no worries! ':'')+ph.en;
   setBanner(zh,en,correction?'correct':'');
-  Voice.say(zh,correction);
+  Voice.say(zh,en,correction);
   G.instr={style:ph.style,requested:style,zh,en,t:G.t,landmark:ph.landmark||null,curiosity,correction}; G.instrSeq++;
   // a human who has not touched the controls yet is not evidence: the 3.5s clock arms on first movement. The auto-walker is measured strictly.
   G.trial={style:ph.style,delivered:ph.style,t0:G.t,x0:q.pos.x,y0:q.pos.y,dir:[...q.dirTo],wp:engine.route.i,landmark:ph.landmark||null,armed:G.auto};
@@ -770,8 +783,8 @@ function resolveTrial(ok,why){
 function afterFail(res,{correction=false}={}){
   if(res.switched){
     const zh=(correction?'走錯囉，沒關係！':'')+'好吧，我換種方式。';
-    setBanner(zh,(correction?'Wrong way — no worries! ':'')+'Alright, let me try another way.',correction?'correct':'');
-    Voice.say(zh,true); if(correction) G.correctionUntil=G.t+2.2;
+    const en=(correction?'Wrong way — no worries! ':'')+'Alright, let me try another way.'; setBanner(zh,en,correction?'correct':'');
+    Voice.say(zh,en,true); if(correction) G.correctionUntil=G.t+2.2;
     schedule(1.4,()=>prepareInstruction({correction:false}));
   } else prepareInstruction({correction});
 }
@@ -854,12 +867,15 @@ document.querySelectorAll('button.persona').forEach(b=>b.onclick=()=>{ Sfx.ensur
   if(G.auto&&G.persona&&G.persona.id===P.id){ G.auto=false; G.walker.mode='idle'; syncPersonaButtons(); return; }
   if(!G.persona||G.persona.id!==P.id){ G.persona=P; resetMemory(); addLog(`切換為「${P.name}」— 記憶重新開始（兩位旅客的記憶不重疊）`,'switch'); }
   G.auto=true; startTrip(pickExit()); syncPersonaButtons(); });
+document.getElementById('btnLang').onclick=function(){ Voice.lang=Voice.lang==='en'?'zh':'en'; Voice.stop(); this.textContent=Voice.lang==='en'?'🗣 EN':'🗣 中文'; };
+document.getElementById('btnReset').onclick=()=>{ G.auto=false; G.persona=null; G.walker.mode='idle'; resetMemory(); syncPersonaButtons(); addLog('記憶已清空 — 飛寶從零開始','switch'); startTrip(pickExit()); };
+window.addEventListener('keydown',e=>{ if(e.repeat||e.metaKey||e.ctrlKey) return; const k=e.key.toLowerCase(); if(k==='1') document.getElementById('btnP1').click(); else if(k==='2') document.getElementById('btnP2').click(); else if(k==='n') btnTrip.click(); else if(k==='r') document.getElementById('btnReset').click(); else if(k==='m') btnMute.click(); });
 btn3d.onclick=()=>{ document.body.classList.toggle('tilt'); btn3d.classList.toggle('on',document.body.classList.contains('tilt')); };
 document.body.classList.add('tilt');
 function pickExit(){ const v=+exitSel.value; return v>=0?v:Math.floor(Math.random()*3); }
 btnTrip.onclick=()=>{ Sfx.ensure(); startTrip(pickExit()); };
 
-btnMute.onclick=()=>{ const m=!Voice.muted; Voice.muted=m; Sfx.muted=m; if(m) Voice.stop(); btnMute.textContent=m?'🔇 靜音':'🔊 語音'; btnMute.classList.toggle('on',m); };
+btnMute.onclick=()=>{ const m=!Voice.muted; Voice.muted=m; Sfx.muted=m; if(m) Voice.stop(); btnMute.textContent=m?'🔇':'🔊'; btnMute.classList.toggle('on',m); };
 
 /* ---- side panel ---- */
 const stylesEl=document.getElementById('styles'), logEl=document.getElementById('log'), tripsBody=document.querySelector('#trips tbody');
@@ -908,7 +924,7 @@ function step(now){
     if(ev.arrived){ finishTrip(); }
     else{
       if(ev.replanned){ G.trip.replans++; addLog('偏離超過 250px，從目前位置重新規劃（不回頭走已通過的路口）',''); clearPending(); G.trial=null; if(G.auto) G.walker.mode='idle'; prepareInstruction({}); }
-      if(ev.recovered && G.t-G.lastRecoveryLine>6){ G.lastRecoveryLine=G.t; Voice.say('回來就好，不丟臉。',false); addLog('回到路上 — 「回來就好，不丟臉。」',''); }
+      if(ev.recovered && G.t-G.lastRecoveryLine>6){ G.lastRecoveryLine=G.t; Voice.say('回來就好，不丟臉。',"Good, you're back. No shame in that.",false); addLog('回到路上 — 「回來就好，不丟臉。」',''); }
       // trial measurement
       const tr=G.trial;
       if(tr){
@@ -935,7 +951,7 @@ function step(now){
   else { tx=p.x+d[0]*48+Math.sin(G.t*2.1)*5; ty=p.y+d[1]*48-10+Math.cos(G.t*1.6)*5; }
   const lerp=Math.min(1,dt*(correcting?9:5)); o.x+=(tx-o.x)*lerp; o.y+=(ty-o.y)*lerp;
   const want=active&&engine.state!=='ARRIVED'?Math.atan2(d[1],d[0]):Math.atan2(p.y-o.y,p.x-o.x); let da=want-o.ang; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; o.ang+=da*Math.min(1,dt*6);
-  o.hard=correcting; o.flap+=dt*(correcting?22:(sp>20?11:6));
+  o.hard=correcting; o.t=G.t; o.flap+=dt*(correcting?22:(sp>20?11:6));
   updateParticles(dt);
 
   /* ---- draw ---- */
